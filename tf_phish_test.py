@@ -8,10 +8,11 @@ import numpy as np #Linear algebra component
 df = pd.read_csv("Phishing_Legitimate_full.csv")
 
 # Last column is usually the target (phishing/legitimate)
-x = df.iloc[:, :-1].values
-y = df.iloc[:, -1].values
+x = df.iloc[:, :-1].values #measures all columns except the last one which is the labels
+y = df.iloc[:, -1].values # labels
 
 # 2. Train/test split
+# divide the data into two parts to have training set and test set 
 x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=0.2,random_state=42)
 
 # 3. Normalize - important for NN

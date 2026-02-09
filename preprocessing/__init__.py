@@ -5,14 +5,25 @@ Unified interface for parsing raw emails and extracting features for ML models.
 
 Usage:
     from preprocessing import preprocess_email, EmailFeatures
-    
+
     result = preprocess_email(raw_email_text)
     print(result['subject'])
     print(result['features'].to_dict())
+
+    # With LSA embeddings:
+    from preprocessing import preprocess_email_with_lsa, fit_lsa_encoder
+
+    # First, fit the LSA encoder on your corpus
+    lsa_encoder = fit_lsa_encoder(training_emails, n_components=768)
+
+    # Then use it in preprocessing
+    result = preprocess_email_with_lsa(raw_email_text, lsa_encoder)
+    print(result['lsa_embedding'].shape)  # (768,)
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from dataclasses import asdict
+import numpy as np
 
 from .email_parser import (
     EmailParser,
@@ -34,23 +45,31 @@ from .feature_extractor import (
     extract_features,
 )
 
+# Conditional import for LSA to avoid hard dependency
+if TYPE_CHECKING:
+    from bert_base.lsa_tool import LSATextEncoder
+
 
 __all__ = [
-    # Main function
+    # Main functions
     'preprocess_email',
-    
+    'preprocess_email_with_lsa',
+    'preprocess_email_batch_with_lsa',
+    'fit_lsa_encoder',
+    'get_combined_feature_vector',
+
     # Parser classes
     'EmailParser',
     'ParsedEmail',
     'AttachmentInfo',
     'parse_email',
-    
+
     # URL extractor
     'URLExtractor',
     'URLInfo',
     'extract_urls',
     'get_unique_domains',
-    
+
     # Feature extractor
     'FeatureExtractor',
     'EmailFeatures',
@@ -139,10 +158,10 @@ def preprocess_email_batch(raw_emails: List[str]) -> List[Dict[str, Any]]:
 def get_feature_matrix(raw_emails: List[str]) -> tuple:
     """
     Extract feature matrix from multiple emails.
-    
+
     Args:
         raw_emails: List of raw email texts
-        
+
     Returns:
         Tuple of (feature_matrix, feature_names) where feature_matrix
         is a list of feature vectors suitable for ML models
@@ -151,3 +170,158 @@ def get_feature_matrix(raw_emails: List[str]) -> tuple:
     feature_matrix = [r['feature_vector'] for r in results]
     feature_names = EmailFeatures.feature_names()
     return feature_matrix, feature_names
+
+
+def fit_lsa_encoder(raw_emails: List[str],
+                   n_components: int = 768,
+                   max_features: Optional[int] = None,
+                   min_df: int = 1,
+                   max_df: float = 0.85) -> 'LSATextEncoder':
+    """
+    Fit an LSA encoder on a corpus of emails.
+
+    This function preprocesses the emails to extract body text, then trains
+    an LSA model to generate semantic embeddings. The fitted encoder can be
+    saved and reused for consistent embeddings.
+
+    Args:
+        raw_emails: List of raw email texts to train on
+        n_components: Number of LSA dimensions (default: 768)
+        max_features: Optional limit on vocabulary size
+        min_df: Minimum document frequency for terms
+        max_df: Maximum document frequency (proportion)
+
+    Returns:
+        Fitted LSATextEncoder instance
+
+    Example:
+        >>> training_emails = load_training_data()
+        >>> encoder = fit_lsa_encoder(training_emails, n_components=768)
+        >>> # Save for later use
+        >>> import joblib
+        >>> joblib.dump(encoder, 'lsa_encoder.pkl')
+    """
+    # Import here to avoid circular dependency
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent / 'bert_base'))
+    from lsa_tool import LSATextEncoder
+
+    # Extract body text from all emails
+    print(f"Preprocessing {len(raw_emails)} emails for LSA training...")
+    body_texts = []
+    for email in raw_emails:
+        result = preprocess_email(email)
+        # Combine subject and body for richer semantic content
+        combined_text = f"{result['subject']} {result['body_text']}"
+        body_texts.append(combined_text)
+
+    # Fit the LSA encoder
+    print(f"Fitting LSA encoder with {n_components} components...")
+    encoder = LSATextEncoder(
+        n_components=n_components,
+        max_features=max_features,
+        min_df=min_df,
+        max_df=max_df
+    )
+    encoder.fit(body_texts)
+
+    # Show explained variance
+    explained_var = encoder.explained_variance_ratio()
+    if explained_var is not None:
+        total_var = explained_var.sum()
+        print(f"LSA encoder fitted. Total explained variance: {total_var:.3f}")
+
+    return encoder
+
+
+def preprocess_email_with_lsa(raw_email: str,
+                               lsa_encoder: 'LSATextEncoder') -> Dict[str, Any]:
+    """
+    Complete preprocessing pipeline including LSA embeddings.
+
+    This function runs the standard preprocessing (parse → URLs → features)
+    and additionally generates a 768-dimensional semantic embedding using
+    the provided LSA encoder.
+
+    Args:
+        raw_email: Raw email text (RFC 822 / mbox format)
+        lsa_encoder: Pre-fitted LSATextEncoder instance
+
+    Returns:
+        Dictionary containing all standard preprocessing outputs PLUS:
+        - lsa_embedding: numpy array of shape (768,) with semantic embedding
+        - combined_vector: numpy array of shape (802,) = 34 features + 768 LSA
+
+    Example:
+        >>> encoder = fit_lsa_encoder(training_emails)
+        >>> result = preprocess_email_with_lsa(test_email, encoder)
+        >>> print(result['lsa_embedding'].shape)  # (768,)
+        >>> print(result['combined_vector'].shape)  # (802,)
+    """
+    # Run standard preprocessing
+    result = preprocess_email(raw_email)
+
+    # Generate LSA embedding from subject + body
+    combined_text = f"{result['subject']} {result['body_text']}"
+    lsa_embedding = lsa_encoder.transform([combined_text])[0]  # Shape: (768,)
+
+    # Add LSA embedding to result
+    result['lsa_embedding'] = lsa_embedding
+
+    # Create combined feature vector: [34 numeric features] + [768 LSA dims]
+    numeric_features = np.array(result['feature_vector'], dtype=np.float32)
+    combined = np.concatenate([numeric_features, lsa_embedding])
+    result['combined_vector'] = combined
+
+    return result
+
+
+def preprocess_email_batch_with_lsa(raw_emails: List[str],
+                                     lsa_encoder: 'LSATextEncoder') -> List[Dict[str, Any]]:
+    """
+    Process multiple emails with LSA embeddings.
+
+    Args:
+        raw_emails: List of raw email texts
+        lsa_encoder: Pre-fitted LSATextEncoder instance
+
+    Returns:
+        List of preprocessing results, each including LSA embeddings
+
+    Example:
+        >>> encoder = fit_lsa_encoder(training_emails)
+        >>> results = preprocess_email_batch_with_lsa(test_emails, encoder)
+        >>> embeddings = [r['lsa_embedding'] for r in results]
+    """
+    return [preprocess_email_with_lsa(email, lsa_encoder) for email in raw_emails]
+
+
+def get_combined_feature_vector(raw_email: str,
+                                lsa_encoder: 'LSATextEncoder') -> np.ndarray:
+    """
+    Extract the complete 802-dimensional feature vector for ML models.
+
+    This is a convenience function that returns just the combined feature
+    vector (34 numeric features + 768 LSA dimensions) suitable for direct
+    input to classifiers.
+
+    Args:
+        raw_email: Raw email text
+        lsa_encoder: Pre-fitted LSATextEncoder instance
+
+    Returns:
+        numpy array of shape (802,) containing:
+        - [0:34]: Numeric features (URLs, text, headers, HTML, attachments)
+        - [34:802]: LSA semantic embedding
+
+    Example:
+        >>> encoder = fit_lsa_encoder(training_emails)
+        >>> X = np.array([get_combined_feature_vector(email, encoder)
+        ...               for email in test_emails])
+        >>> print(X.shape)  # (n_emails, 802)
+        >>> # Now X is ready for your classifier
+        >>> predictions = model.predict(X)
+    """
+    result = preprocess_email_with_lsa(raw_email, lsa_encoder)
+    return result['combined_vector']

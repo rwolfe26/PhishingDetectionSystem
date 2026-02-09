@@ -2,7 +2,7 @@
 
 A production-ready machine learning pipeline for detecting phishing emails using preprocessing and semantic analysis.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 ```bash
@@ -46,7 +46,7 @@ Training on **3,052 emails** (2,551 ham + 501 spam):
 - **False Positive Rate: 0.20%** (1 in 511 ham emails)
 - **False Negative Rate: 3.00%** (3 in 100 spam emails)
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 Detection_System/
@@ -97,7 +97,7 @@ Detection_System/
 └── README.md                     # This file
 ```
 
-## 🔧 Features
+## Features
 
 ### Email Preprocessing (34 Features)
 - **URL Analysis**: IP addresses, HTTPS ratio, suspicious ports, path depth
@@ -116,7 +116,7 @@ Detection_System/
 - **Feature Importance**: Identifies key phishing indicators
 - **Risk Levels**: HIGH/MEDIUM/LOW/Safe based on confidence scores
 
-## 📚 Documentation
+## Documentation
 
 Detailed documentation is available in the `docs/` directory:
 
@@ -125,7 +125,7 @@ Detailed documentation is available in the `docs/` directory:
 - **[LSA_PREPROCESSING_INTEGRATION.md](docs/LSA_PREPROCESSING_INTEGRATION.md)** - Integration details
 - **[REFACTORING_SUMMARY.md](docs/REFACTORING_SUMMARY.md)** - Project evolution
 
-## 🧪 Usage Examples
+## Usage Examples
 
 ### Programmatic Usage
 
@@ -201,7 +201,7 @@ probability = classifier.predict_proba(X)[0][1]  # spam confidence
 - [ ] Federated learning for privacy
 - [ ] Mobile app integration
 
-## 🔬 Technical Details
+## Technical Details
 
 ### Feature Engineering
 - **Header Analysis**: From/Reply-To domain matching, X-Mailer patterns
@@ -236,7 +236,7 @@ Raw Email
 5. Evaluate on held-out test set
 6. Save models for deployment
 
-## 🛡️ Security & Privacy
+## Security & Privacy
 
 ### Current Implementation
 - **In-Memory Processing**: Emails processed without persistence
@@ -250,7 +250,7 @@ Raw Email
 - **PII Redaction**: Anonymization of stored samples
 - **OAuth Security**: Least-privilege scopes for email access
 
-## 📦 Dataset Information
+## Dataset Information
 
 ### Included Datasets
 - **easy_ham**: 2,551 legitimate emails
@@ -269,7 +269,7 @@ tar -xjf spam_2.tar.bz2
 tar -xjf easy_ham_2.tar.bz2
 ```
 
-## 🧪 Testing
+## Testing
 
 Run the test suite:
 ```bash
@@ -281,31 +281,5 @@ Run preprocessing tests:
 python -m pytest tests/test_preprocessing.py -v
 ```
 
-## 🤝 Contributing
 
-1. Create a feature branch
-2. Make your changes
-3. Write tests for new features
-4. Ensure all tests pass
-5. Submit a pull request
 
-## 📄 License
-
-[Add your license here]
-
-## 🙏 Acknowledgments
-
-- SpamAssassin dataset for training data
-- scikit-learn for machine learning tools
-- Research community for LSA methodology
-
-## 📞 Support
-
-For issues or questions:
-- Check the documentation in `docs/`
-- Review examples in `examples/`
-- Open an issue on GitHub
-
----
-
-**Status**: Production-ready MVP with 99.35% accuracy ✅

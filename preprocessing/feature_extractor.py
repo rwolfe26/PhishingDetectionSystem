@@ -390,7 +390,8 @@ class FeatureExtractor:
         auth_result = ''
         for key, value in parsed_email.headers.items():
             if key.lower() in ('authentication-results', 'arc-authentication-results'):
-                auth_result += ' ' + value.lower()
+                val = value if isinstance(value, str) else ' '.join(value)
+                auth_result += ' ' + val.lower()
         if auth_result:
             fail_patterns = ['spf=fail', 'spf=none', 'dkim=fail', 'dkim=none',
                              'dmarc=fail', 'dmarc=none']
@@ -404,49 +405,44 @@ class FeatureExtractor:
         from_raw = parsed_email.from_address
         display_match = re.match(r'^([^<]+)<([^>]+)>', from_raw)
         if display_match:
-            display_name = display_match.group(1).strip()
+            display_name = display_match.group(1).strip().lower()
             actual_addr = display_match.group(2).strip()
-            # Check if display name contains a known brand but actual domain differs
-            display_lower = display_name.lower()
-            for brand in self.BRAND_DOMAINS:
-                brand_name = brand.split('.')[0]
-                actual_domain = re.search(r'@([\w.-]+)', actual_addr)
-                if (brand_name in display_lower and actual_domain and
-                        brand not in actual_domain.group(1).lower()):
-                    features.sender_domain_mismatch = 1
-                    break
+            actual_domain_m = re.search(r'@([\w.-]+)', actual_addr)
+            if actual_domain_m:
+                actual_domain = actual_domain_m.group(1).lower()
+                for brand in self.BRAND_DOMAINS:
+                    brand_name = brand.split('.')[0]
+                    if brand_name in display_name and brand not in actual_domain:
+                        features.sender_domain_mismatch = 1
+                        break
 
-        # Homograph characters in URL domains
+        # Homograph characters — non-ASCII in URL domains (cap at first 10 URLs)
         total_homograph = 0
-        for url_info in urls:
-            domain = url_info.domain
-            for char in domain:
-                if ord(char) > 127:  # Non-ASCII in domain
-                    total_homograph += 1
+        for url_info in urls[:10]:
+            total_homograph += sum(1 for c in url_info.domain if ord(c) > 127)
         features.num_homograph_chars = total_homograph
 
-        # Brand impersonation score — min Levenshtein distance to known brand domains
+        # Brand impersonation score — Levenshtein on first 5 URLs, length-filtered
         if urls:
-            min_score = 1.0
-            for url_info in urls:
+            min_norm = 1.0
+            for url_info in urls[:5]:
                 domain = url_info.domain.lower()
                 if not domain:
                     continue
-                # Skip if the domain IS the brand
+                domain_root = domain.split('.')[0] if '.' in domain else domain
                 for brand in self.BRAND_DOMAINS:
                     if domain == brand:
                         continue
                     brand_root = brand.split('.')[0]
-                    domain_root = domain.split('.')[0] if '.' in domain else domain
-                    # Quick filter: only compare domains that look similar in length
-                    if abs(len(domain_root) - len(brand_root)) <= 3:
-                        dist = self._levenshtein(domain_root, brand_root)
-                        # Normalise: 0 = identical, 1 = completely different
-                        max_len = max(len(domain_root), len(brand_root), 1)
-                        norm = dist / max_len
-                        if norm > 0:  # Not identical
-                            min_score = min(min_score, norm)
-            features.brand_impersonation_score = round(1.0 - min_score, 4)
+                    # Only compare if length difference is small (fast pre-filter)
+                    if abs(len(domain_root) - len(brand_root)) > 3:
+                        continue
+                    dist = self._levenshtein(domain_root, brand_root)
+                    max_len = max(len(domain_root), len(brand_root), 1)
+                    norm = dist / max_len
+                    if 0 < norm < min_norm:
+                        min_norm = norm
+            features.brand_impersonation_score = round(1.0 - min_norm, 4)
 
         # Urgency density
         if features.num_words > 0:
@@ -454,20 +450,20 @@ class FeatureExtractor:
                 features.num_urgent_keywords / features.num_words, 6
             )
 
-        # HTML-to-text ratio
+        # HTML-to-text ratio (capped to avoid extreme values)
         html_len = len(parsed_email.body_html or '')
         text_len = len(parsed_email.body_text or '')
-        features.html_text_ratio = round(html_len / (text_len + 1), 4)
+        features.html_text_ratio = round(min(html_len / (text_len + 1), 100.0), 4)
 
         # URL shortener count
         features.num_shortener_urls = sum(
             1 for u in urls if u.domain.lower() in self.URL_SHORTENERS
         )
 
-        # Generic greeting detection
-        combined_text = (parsed_email.body_text or '').lower()
+        # Generic greeting detection — search first 500 chars of body
+        body_start = (parsed_email.body_text or '')[:500].lower()
         features.greeting_generic = int(
-            any(g in combined_text for g in self.GENERIC_GREETINGS)
+            any(g in body_start for g in self.GENERIC_GREETINGS)
         )
 
         # Authentication action keywords

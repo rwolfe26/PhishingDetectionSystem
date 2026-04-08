@@ -11,6 +11,8 @@ import joblib
 
 from preprocessing import (
     fit_lsa_encoder,
+    fit_lsa_encoder_from_texts,
+    fit_and_extract_features,
     preprocess_email_batch_with_lsa,
     preprocess_email_with_lsa,
 )
@@ -48,6 +50,8 @@ class EmailPhishingPipeline:
         """
         Fit the LSA encoder on training emails.
 
+        Note: Prefer fit_lsa_and_extract() to avoid double-preprocessing.
+
         Args:
             emails: List of raw email texts
         """
@@ -64,6 +68,61 @@ class EmailPhishingPipeline:
 
         print(f"LSA encoder fitted with {self.lsa_encoder.n_components} components")
 
+    def fit_lsa_and_extract(self, emails: List[str]) -> np.ndarray:
+        """
+        Fit the LSA encoder AND extract features in a single preprocessing pass.
+
+        This is 2× faster than calling fit_lsa() followed by extract_features(),
+        because it avoids running the full email parser twice.
+
+        Args:
+            emails: List of raw email texts (training set)
+
+        Returns:
+            Feature matrix of shape (n_emails, n_numeric + n_lsa)
+        """
+        from preprocessing import preprocess_email, fit_lsa_encoder_from_texts
+
+        print(f"\n{'='*60}")
+        print("Single-Pass: Preprocessing + LSA Fit + Feature Extraction")
+        print(f"{'='*60}")
+        print(f"Processing {len(emails)} emails (single pass)...")
+
+        # One pass: parse emails, collect body texts and numeric features
+        body_texts = []
+        numeric_features_list = []
+        for i, email in enumerate(emails):
+            from preprocessing import preprocess_email as _pe
+            result = _pe(email)
+            body_texts.append(f"{result['subject']} {result['body_text']}")
+            numeric_features_list.append(np.array(result['feature_vector'], dtype=np.float32))
+            if (i + 1) % 2000 == 0:
+                print(f"  Parsed {i+1}/{len(emails)} emails...")
+
+        # Fit LSA on body texts
+        self.lsa_encoder = fit_lsa_encoder_from_texts(
+            body_texts,
+            n_components=self.lsa_components,
+            min_df=self.lsa_min_df,
+            max_df=self.lsa_max_df,
+        )
+
+        # Batch transform all texts with LSA at once
+        lsa_embeddings = self.lsa_encoder.transform(body_texts)
+
+        # Concatenate numeric + LSA for each email
+        X = np.array([
+            np.concatenate([numeric_features_list[i], lsa_embeddings[i]])
+            for i in range(len(emails))
+        ])
+
+        self.feature_dim = X.shape[1]
+        n_numeric = len(numeric_features_list[0])
+        print(f"Feature extraction complete: shape = {X.shape}")
+        print(f"  - {n_numeric} numeric features + {self.lsa_encoder.n_components} LSA dims")
+
+        return X
+
     def extract_features(self, emails: List[str]) -> np.ndarray:
         """
         Extract combined features (preprocessing + LSA) from emails.
@@ -79,18 +138,29 @@ class EmailPhishingPipeline:
 
         print(f"Extracting features from {len(emails)} emails...")
 
-        # Use batch preprocessing with LSA
-        results = preprocess_email_batch_with_lsa(emails, self.lsa_encoder)
+        from preprocessing import preprocess_email as _pe
+        body_texts = []
+        numeric_features_list = []
+        for i, email in enumerate(emails):
+            result = _pe(email)
+            body_texts.append(f"{result['subject']} {result['body_text']}")
+            numeric_features_list.append(np.array(result['feature_vector'], dtype=np.float32))
+            if (i + 1) % 2000 == 0:
+                print(f"  Parsed {i+1}/{len(emails)} emails...")
 
-        # Extract combined feature vectors
-        X = np.array([r['combined_vector'] for r in results])
+        lsa_embeddings = self.lsa_encoder.transform(body_texts)
+
+        X = np.array([
+            np.concatenate([numeric_features_list[i], lsa_embeddings[i]])
+            for i in range(len(emails))
+        ])
 
         if self.feature_dim is None:
             self.feature_dim = X.shape[1]
 
+        n_numeric = len(numeric_features_list[0]) if numeric_features_list else 0
         print(f"Extracted features: shape = {X.shape}")
-        print(f"  - {self.feature_dim} total dimensions")
-        print(f"  - 34 numeric features + {self.lsa_encoder.n_components} LSA dimensions")
+        print(f"  - {n_numeric} numeric features + {self.lsa_encoder.n_components} LSA dims")
 
         return X
 

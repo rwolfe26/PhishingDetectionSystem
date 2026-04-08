@@ -1,14 +1,15 @@
 # LSA + Preprocessing Integration
 
-This document explains how the LSA tool has been integrated with the preprocessing pipeline for the email phishing detection system.
+This document explains how the LSA semantic analysis is integrated with the preprocessing pipeline.
 
 ## Overview
 
-The integration connects two key components:
-1. **Preprocessing Pipeline**: Extracts 34 numeric features from emails (URLs, text patterns, headers, HTML, attachments)
-2. **LSA Tool**: Generates semantic embeddings (up to 768 dimensions) from email text
+The integration connects two components:
 
-The combined output provides rich feature vectors for machine learning models.
+1. **Preprocessing Pipeline** — extracts 42 numeric features from emails (URLs, text, headers, HTML, attachments, and phishing-specific signals)
+2. **LSA Tool** — generates semantic embeddings (configurable N dimensions, default 128) from email text
+
+The combined output provides rich feature vectors for the classifier.
 
 ## Architecture
 
@@ -19,306 +20,181 @@ Raw Email Text
     ↓
 [URL Extractor] → List[URLInfo] (domains, paths, suspicious patterns)
     ↓
-[Feature Extractor] → 34 numeric features
+[Feature Extractor] → 42 numeric features
     ↓
-[LSA Encoder] → N-dimensional semantic embedding (e.g., 768 dims)
+[LSA Encoder] → N-dimensional semantic embedding (e.g., 128 dims)
     ↓
-Combined Feature Vector: [34 numeric features] + [N LSA dimensions]
+Combined Feature Vector: [42 numeric] + [N LSA dims] = (42+N,)
 ```
+
+## Efficient Single-Pass Training
+
+The key efficiency improvement is `fit_lsa_and_extract()` in `EmailPhishingPipeline`, which
+parses each email exactly once during training:
+
+```python
+# OLD approach (2× slower — emails parsed twice)
+pipeline.fit_lsa(train_emails)          # parse → extract text → fit LSA
+X_train = pipeline.extract_features(train_emails)  # parse → extract features → LSA transform
+
+# NEW approach (single pass)
+X_train = pipeline.fit_lsa_and_extract(train_emails)
+# Internally: parse → collect body_texts + numeric features → fit LSA → batch transform
+```
+
+For large datasets (10k+ emails), this halves the preprocessing time.
 
 ## Installation
 
-Install required dependencies:
-
 ```bash
 source .venv/bin/activate
-pip install scikit-learn joblib numpy
+pip install -r requirements.txt
 ```
 
 ## Usage
 
-### 1. Fit the LSA Encoder
-
-First, train the LSA encoder on your corpus of emails:
+### Fit the LSA Encoder
 
 ```python
 from preprocessing import fit_lsa_encoder
 
-# Load your training emails (raw RFC 822 format)
-training_emails = load_your_training_data()
+# From raw emails (also preprocesses to extract body text)
+lsa = fit_lsa_encoder(training_emails, n_components=128, min_df=2, max_df=0.85)
 
-# Fit the encoder
-lsa_encoder = fit_lsa_encoder(
-    training_emails,
-    n_components=768,    # Target dimensions (may be reduced automatically)
-    min_df=2,            # Ignore very rare terms
-    max_df=0.85          # Ignore very common terms
-)
+# From pre-extracted body texts (faster — skip email parsing)
+from preprocessing import fit_lsa_encoder_from_texts
+lsa = fit_lsa_encoder_from_texts(body_texts, n_components=128)
 
-# Save the encoder for later use
 import joblib
-joblib.dump(lsa_encoder, 'lsa_encoder.pkl')
+joblib.dump(lsa, 'models/lsa_encoder.pkl')
 ```
 
-**Important**: The actual number of LSA components depends on your corpus size:
-- With 500 emails, you might get ~500 components
-- With 2,551 emails (full dataset), you can get closer to 768
-- The encoder automatically reduces dimensions if needed
-
-### 2. Process Individual Emails
-
-Use the integrated pipeline to process single emails:
+### Process a Single Email
 
 ```python
 from preprocessing import preprocess_email_with_lsa
+import joblib
 
-result = preprocess_email_with_lsa(raw_email, lsa_encoder)
+lsa = joblib.load('models/lsa_encoder.pkl')
+result = preprocess_email_with_lsa(raw_email, lsa)
 
-# Access the results
-print(result['subject'])              # Email subject
-print(result['from_address'])         # Sender address
-print(result['urls'])                 # List of URLInfo objects
-print(result['feature_dict'])         # Dict of 34 numeric features
-print(result['lsa_embedding'])        # Array of shape (N,) - LSA embedding
-print(result['combined_vector'])      # Array of shape (34+N,) - Full feature vector
+print(result['lsa_embedding'].shape)    # (128,)
+print(result['combined_vector'].shape)  # (170,)  → 42 numeric + 128 LSA
 ```
 
-The result dictionary contains:
-- `subject`: Email subject string
-- `body_text`: Plain text body
-- `from_address`: Sender email
-- `urls`: List of URLInfo objects with analysis
-- `features`: EmailFeatures object with 34 numeric features
-- `feature_vector`: List of 34 numeric values
-- `lsa_embedding`: numpy array (N,) with semantic embedding
-- `combined_vector`: numpy array (34+N,) ready for ML models
-
-### 3. Batch Processing
-
-Process multiple emails efficiently:
+### Batch Processing
 
 ```python
 from preprocessing import preprocess_email_batch_with_lsa
 import numpy as np
 
-results = preprocess_email_batch_with_lsa(test_emails, lsa_encoder)
-
-# Extract feature matrix for ML model
-X = np.array([r['combined_vector'] for r in results])
-# X.shape = (num_emails, 34 + N_components)
-
-# Extract labels if you have them
-y = np.array([r['label'] for r in your_labeled_data])
-
-# Train your classifier
-from sklearn.ensemble import RandomForestClassifier
-model = RandomForestClassifier()
-model.fit(X, y)
+results = preprocess_email_batch_with_lsa(email_list, lsa)
+X = np.array([r['combined_vector'] for r in results])  # (n_emails, 42+N)
 ```
 
-### 4. Convenience Function for Quick Extraction
-
-For streamlined feature extraction:
+### Single-Pass Fit + Extract (Most Efficient)
 
 ```python
-from preprocessing import get_combined_feature_vector
+from preprocessing import fit_and_extract_features
 
-# Get just the feature vector
-vector = get_combined_feature_vector(raw_email, lsa_encoder)
-# vector.shape = (34 + N_components,)
-
-# Build feature matrix for multiple emails
-X = np.array([
-    get_combined_feature_vector(email, lsa_encoder)
-    for email in emails
-])
+# Returns (feature_matrix, body_texts) in one parse pass
+X, body_texts = fit_and_extract_features(train_emails, lsa)
 ```
 
-## Feature Breakdown
-
-### Numeric Features (34 dimensions)
-
-The first 34 dimensions contain:
+## The 42 Numeric Features
 
 | Category | Count | Examples |
-|----------|-------|----------|
-| URL-based | 10 | num_urls, has_ip_url, no_https_ratio, suspicious_port |
-| Text-based | 4 | num_words, num_chars, num_special_chars |
-| Keyword-based | 3 | urgent_keywords, credential_keywords, action_keywords |
-| Header-based | 6 | reply_to_mismatch, suspicious_mailer, num_hops |
-| HTML-based | 5 | has_form, has_iframe, has_hidden_text |
-| Attachment-based | 3 | num_attachments, has_executable, has_archive |
+|----------|-------|---------|
+| URL | 10 | `num_urls`, `has_ip_url`, `no_https_ratio`, `num_shortener_urls`, `brand_impersonation_score` |
+| Text | 4 | `num_words`, `num_chars`, `num_special_chars` |
+| Keywords | 3 | `num_urgent_keywords`, `num_credential_keywords`, `num_action_keywords` |
+| Headers | 6 | `has_reply_to_mismatch`, `spf_dkim_fail`, `sender_domain_mismatch` |
+| HTML | 6 | `has_form`, `has_iframe`, `has_hidden_text` |
+| Attachments | 3 | `has_executable_attachment`, `has_archive_attachment` |
+| Phishing-specific | 10 | `num_homograph_chars`, `urgency_density`, `greeting_generic`, `subject_all_caps_ratio` |
 
-### LSA Semantic Embedding (up to 768 dimensions)
-
-The remaining dimensions contain semantic information from:
-- Email subject
-- Email body text
-- Preprocessed with TF-IDF and Truncated SVD
-- L2-normalized for stability
-
-The actual number of LSA dimensions depends on your corpus size and vocabulary.
-
-## Example: Complete Workflow
-
-```python
-import numpy as np
-from pathlib import Path
-import joblib
-from preprocessing import (
-    fit_lsa_encoder,
-    preprocess_email_batch_with_lsa
-)
-
-# 1. Load training data
-def load_emails(directory):
-    emails = []
-    for file in Path(directory).glob('*'):
-        if file.is_file():
-            emails.append(file.read_text(encoding='utf-8', errors='ignore'))
-    return emails
-
-ham_emails = load_emails('Datasets/easy_ham')
-spam_emails = load_emails('Datasets/spam')
-all_training = ham_emails + spam_emails
-
-# 2. Fit LSA encoder
-encoder = fit_lsa_encoder(all_training, n_components=768, min_df=2)
-joblib.dump(encoder, 'models/lsa_encoder.pkl')
-
-# 3. Create labeled dataset
-X_ham_results = preprocess_email_batch_with_lsa(ham_emails, encoder)
-X_spam_results = preprocess_email_batch_with_lsa(spam_emails, encoder)
-
-X_ham = np.array([r['combined_vector'] for r in X_ham_results])
-X_spam = np.array([r['combined_vector'] for r in X_spam_results])
-
-X = np.vstack([X_ham, X_spam])
-y = np.array([0] * len(X_ham) + [1] * len(X_spam))  # 0=ham, 1=spam
-
-# 4. Train classifier
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
-
-clf = RandomForestClassifier(n_estimators=100, random_state=42)
-clf.fit(X_train, y_train)
-
-# 5. Evaluate
-y_pred = clf.predict(X_test)
-print(classification_report(y_test, y_pred))
-
-# 6. Save model
-joblib.dump(clf, 'models/phishing_classifier.pkl')
-```
-
-## Advanced Usage
-
-### Reusing a Saved Encoder
-
-```python
-import joblib
-from preprocessing import preprocess_email_with_lsa
-
-# Load the encoder
-encoder = joblib.load('lsa_encoder.pkl')
-
-# Process new emails
-result = preprocess_email_with_lsa(new_email, encoder)
-```
-
-### Feature Importance Analysis
+Get the ordered list of feature names at runtime:
 
 ```python
 from preprocessing import EmailFeatures
-
-# Get feature names
-numeric_feature_names = EmailFeatures.feature_names()
-lsa_feature_names = [f'lsa_{i}' for i in range(lsa_encoder.n_components)]
-all_feature_names = numeric_feature_names + lsa_feature_names
-
-# After training a model, check feature importance
-if hasattr(model, 'feature_importances_'):
-    importance = model.feature_importances_
-    for name, imp in sorted(zip(all_feature_names, importance),
-                           key=lambda x: x[1], reverse=True)[:20]:
-        print(f"{name}: {imp:.4f}")
+print(EmailFeatures.feature_names())  # list of 42 names
 ```
 
-### Customizing LSA Parameters
+## LSA Parameters
+
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| `n_components` | 128 | Dimensions of semantic embedding. Start with 128; run `experiments/lsa_dimension_search.py` to find the optimal value. |
+| `min_df` | 2 | Terms must appear in ≥ 2 documents. Raise to 5+ for large corpora. |
+| `max_df` | 0.85 | Terms in > 85% of documents are dropped (too common). |
+| `max_features` | None | Optional vocabulary cap. Set to 50000 for memory-constrained environments. |
+
+## LSA Dimensionality Search
+
+Run `experiments/lsa_dimension_search.py` to measure accuracy vs. component count:
+
+```bash
+python experiments/lsa_dimension_search.py --max-emails 3000
+```
+
+Results are saved to `experiments/lsa_dimension_results.csv`. Typically values in the
+range 100–256 give the best F1 with this dataset.
+
+## Example: Full Training + Prediction
 
 ```python
-# For smaller datasets, use fewer components
-encoder = fit_lsa_encoder(
-    emails,
-    n_components=256,      # Fewer dimensions
-    max_features=5000,     # Limit vocabulary size
-    min_df=3,              # Require term appears in 3+ docs
-    max_df=0.7             # Ignore very common terms
+from pathlib import Path
+from pipeline import EmailPhishingPipeline, DataLoader, Trainer, Predictor
+
+# Load data
+loader = DataLoader()
+emails, labels = loader.load_dataset(
+    ham_dirs=[Path('Datasets/easy_ham'), Path('Datasets/easy_ham_2')],
+    spam_dirs=[Path('Datasets/spam'), Path('Datasets/spam_2')],
+)
+csv_emails, csv_labels = loader.load_phishing_csv(
+    Path('Datasets/Phishing_Email.csv'), max_samples=2000
+)
+import numpy as np
+all_emails = emails + csv_emails
+all_labels = np.concatenate([labels, csv_labels])
+
+# Train/test split
+from sklearn.model_selection import train_test_split
+X_tr_emails, X_te_emails, y_tr, y_te = train_test_split(
+    all_emails, all_labels, test_size=0.2, stratify=all_labels, random_state=42
 )
 
-# For larger datasets, you can increase
-encoder = fit_lsa_encoder(
-    emails,
-    n_components=768,      # More dimensions
-    max_features=None,     # No limit on vocabulary
-    min_df=2,              # Include rarer terms
-    max_df=0.95            # Allow more common terms
-)
+# Single-pass: parse once, fit LSA, extract features
+pipeline = EmailPhishingPipeline(lsa_components=128)
+X_train = pipeline.fit_lsa_and_extract(X_tr_emails)
+X_test = pipeline.extract_features(X_te_emails)
+
+# Train and evaluate
+trainer = Trainer()
+trainer.train_classifier(pipeline, X_train, y_tr)
+trainer.evaluate(pipeline, X_test, y_te)
+
+# Save
+pipeline.save_models(Path('models'))
+
+# Later: load and predict
+pipeline.load_models(Path('models'))
+pred, prob = Predictor().predict_single(pipeline, open('email.txt').read())
+print(f"{'PHISHING' if pred == 1 else 'HAM'}  —  confidence: {prob:.1%}")
 ```
-
-## Files Modified
-
-- `preprocessing/__init__.py`: Added 4 new functions:
-  - `fit_lsa_encoder()`: Train LSA on email corpus
-  - `preprocess_email_with_lsa()`: Single email with LSA
-  - `preprocess_email_batch_with_lsa()`: Batch processing with LSA
-  - `get_combined_feature_vector()`: Convenience function
-
-## Performance Notes
-
-- **LSA Fitting**: O(n_emails × vocabulary_size) - can take 1-2 minutes for 2,500 emails
-- **Transform**: Very fast (<1ms per email) after fitting
-- **Memory**: Encoder size ~10-50MB depending on vocabulary
-- **Parallelization**: Batch processing is sequential but can be parallelized if needed
 
 ## Troubleshooting
 
-### "n_components too large"
+### ValueError: After pruning, no terms remain
+Occurs when `min_df` is too high for a small corpus. Use `min_df=1` with
+fewer than ~100 training emails.
 
-If you get an error about n_components being too large:
-- Your corpus is too small for the requested dimensions
-- Either reduce `n_components` or increase your training corpus size
-- The encoder will automatically adjust, but you can set it explicitly
+### Combined vector has wrong shape
+If the LSA encoder was trained with `n_components=768` but you changed it to `128`,
+the saved models will be incompatible. Retrain from scratch after changing `lsa_components`.
 
-### Different dimensions than expected
-
-The actual LSA dimensions depend on:
-- Number of unique terms in your corpus (vocabulary size)
-- The `min_df` and `max_df` filters you apply
-- The number of training documents
-
-For 768 dimensions, you typically need at least 1,000+ documents with good vocabulary diversity.
-
-## Next Steps
-
-1. Train on your full dataset (easy_ham + spam + hard_ham)
-2. Experiment with different classifiers:
-   - Random Forest
-   - Gradient Boosting (XGBoost, LightGBM)
-   - Logistic Regression
-   - Neural Networks
-3. Perform hyperparameter tuning
-4. Add cross-validation
-5. Deploy the model with the saved encoder
-
-## References
-
-- Original LSA research: `bert_base/lsa_research_report.md`
-- Preprocessing design: `preprocessing/` module
-- Email parser: `preprocessing/email_parser.py`
-- Feature extractor: `preprocessing/feature_extractor.py`
+### Memory errors on large corpora
+- Set `max_features=50000` in `fit_lsa_encoder` to cap vocabulary size
+- Reduce `n_components` to 64 or 128
+- Process in batches using `preprocess_email_batch_with_lsa`

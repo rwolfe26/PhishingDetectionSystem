@@ -56,6 +56,8 @@ __all__ = [
     'preprocess_email_with_lsa',
     'preprocess_email_batch_with_lsa',
     'fit_lsa_encoder',
+    'fit_lsa_encoder_from_texts',
+    'fit_and_extract_features',
     'get_combined_feature_vector',
 
     # Parser classes
@@ -172,17 +174,32 @@ def get_feature_matrix(raw_emails: List[str]) -> tuple:
     return feature_matrix, feature_names
 
 
+def _get_lsa_encoder(n_components, max_features, min_df, max_df):
+    """Import and instantiate LSATextEncoder."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent / 'bert_base'))
+    from lsa_tool import LSATextEncoder
+    return LSATextEncoder(
+        n_components=n_components,
+        max_features=max_features,
+        min_df=min_df,
+        max_df=max_df,
+    )
+
+
 def fit_lsa_encoder(raw_emails: List[str],
-                   n_components: int = 768,
-                   max_features: Optional[int] = None,
-                   min_df: int = 1,
-                   max_df: float = 0.85) -> 'LSATextEncoder':
+                    n_components: int = 768,
+                    max_features: Optional[int] = None,
+                    min_df: int = 1,
+                    max_df: float = 0.85) -> 'LSATextEncoder':
     """
     Fit an LSA encoder on a corpus of emails.
 
-    This function preprocesses the emails to extract body text, then trains
-    an LSA model to generate semantic embeddings. The fitted encoder can be
-    saved and reused for consistent embeddings.
+    Preprocesses emails to extract body text, then trains an LSA model.
+    For efficiency, prefer `fit_lsa_encoder_from_texts` if you already have
+    preprocessed texts, or use `fit_and_extract_features` to do everything
+    in one pass.
 
     Args:
         raw_emails: List of raw email texts to train on
@@ -193,46 +210,86 @@ def fit_lsa_encoder(raw_emails: List[str],
 
     Returns:
         Fitted LSATextEncoder instance
-
-    Example:
-        >>> training_emails = load_training_data()
-        >>> encoder = fit_lsa_encoder(training_emails, n_components=768)
-        >>> # Save for later use
-        >>> import joblib
-        >>> joblib.dump(encoder, 'lsa_encoder.pkl')
     """
-    # Import here to avoid circular dependency
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / 'bert_base'))
-    from lsa_tool import LSATextEncoder
-
-    # Extract body text from all emails
     print(f"Preprocessing {len(raw_emails)} emails for LSA training...")
     body_texts = []
-    for email in raw_emails:
+    for i, email in enumerate(raw_emails):
         result = preprocess_email(email)
-        # Combine subject and body for richer semantic content
-        combined_text = f"{result['subject']} {result['body_text']}"
-        body_texts.append(combined_text)
+        body_texts.append(f"{result['subject']} {result['body_text']}")
+        if (i + 1) % 1000 == 0:
+            print(f"  Preprocessed {i+1}/{len(raw_emails)}...")
 
-    # Fit the LSA encoder
-    print(f"Fitting LSA encoder with {n_components} components...")
-    encoder = LSATextEncoder(
-        n_components=n_components,
-        max_features=max_features,
-        min_df=min_df,
-        max_df=max_df
-    )
+    return fit_lsa_encoder_from_texts(body_texts, n_components, max_features, min_df, max_df)
+
+
+def fit_lsa_encoder_from_texts(body_texts: List[str],
+                                n_components: int = 768,
+                                max_features: Optional[int] = None,
+                                min_df: int = 1,
+                                max_df: float = 0.85) -> 'LSATextEncoder':
+    """
+    Fit an LSA encoder on pre-extracted body texts (skips email parsing).
+
+    Args:
+        body_texts: List of pre-extracted text strings (subject + body)
+        n_components: Number of LSA dimensions
+        max_features: Optional vocab cap
+        min_df: Minimum document frequency
+        max_df: Maximum document frequency
+
+    Returns:
+        Fitted LSATextEncoder instance
+    """
+    encoder = _get_lsa_encoder(n_components, max_features, min_df, max_df)
+
+    print(f"Fitting LSA encoder with {n_components} components on {len(body_texts)} texts...")
     encoder.fit(body_texts)
 
-    # Show explained variance
     explained_var = encoder.explained_variance_ratio()
     if explained_var is not None:
-        total_var = explained_var.sum()
-        print(f"LSA encoder fitted. Total explained variance: {total_var:.3f}")
+        print(f"LSA encoder fitted. Total explained variance: {explained_var.sum():.3f}")
 
     return encoder
+
+
+def fit_and_extract_features(raw_emails: List[str],
+                              lsa_encoder: 'LSATextEncoder') -> tuple:
+    """
+    Single-pass preprocessing: parse emails once, return feature matrix and texts.
+
+    This avoids the double-preprocessing that occurs when calling fit_lsa_encoder
+    followed by preprocess_email_batch_with_lsa separately.
+
+    Args:
+        raw_emails: List of raw email texts
+        lsa_encoder: Pre-fitted LSATextEncoder
+
+    Returns:
+        Tuple of (feature_matrix: np.ndarray, body_texts: List[str])
+        where feature_matrix has shape (n_emails, n_numeric + n_lsa)
+    """
+    results = []
+    body_texts = []
+
+    for i, email in enumerate(raw_emails):
+        result = preprocess_email(email)
+        body_texts.append(f"{result['subject']} {result['body_text']}")
+        results.append(result)
+        if (i + 1) % 1000 == 0:
+            print(f"  Preprocessed {i+1}/{len(raw_emails)}...")
+
+    # Batch transform with LSA (much faster than one-at-a-time)
+    lsa_embeddings = lsa_encoder.transform(body_texts)
+
+    feature_matrix = np.array([
+        np.concatenate([
+            np.array(r['feature_vector'], dtype=np.float32),
+            lsa_embeddings[i]
+        ])
+        for i, r in enumerate(results)
+    ])
+
+    return feature_matrix, body_texts
 
 
 def preprocess_email_with_lsa(raw_email: str,

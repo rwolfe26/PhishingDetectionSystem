@@ -93,14 +93,13 @@ def train_pipeline(args):
     print(f"Training set: {len(X_train_emails)} emails")
     print(f"Test set: {len(X_test_emails)} emails")
 
-    # Fit LSA on training data only
-    pipeline.fit_lsa(X_train_emails)
+    # Single-pass: fit LSA + extract training features (2× faster)
+    X_train = pipeline.fit_lsa_and_extract(X_train_emails)
 
-    # Extract features
+    # Extract test features (uses already-fitted LSA)
     print(f"\n{'='*60}")
-    print("Feature Extraction")
+    print("Test Set Feature Extraction")
     print(f"{'='*60}")
-    X_train = pipeline.extract_features(X_train_emails)
     X_test = pipeline.extract_features(X_test_emails)
 
     # Train classifier

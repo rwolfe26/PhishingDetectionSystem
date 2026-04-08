@@ -29,7 +29,7 @@ from sklearn.model_selection import (
 class Trainer:
     """Handles training, evaluation, tuning, and benchmarking of classifiers."""
 
-    # Feature names aligned with EmailFeatures.to_dict() order (42 total)
+    # Feature names aligned with EmailFeatures.to_dict() order (44 total)
     NUMERIC_FEATURE_NAMES = [
         # URL features (0-9)
         'num_urls', 'num_unique_domains', 'has_ip_url', 'no_https_ratio',
@@ -53,6 +53,8 @@ class Trainer:
         'urgency_density', 'html_text_ratio',
         'num_shortener_urls', 'greeting_generic',
         'num_auth_keywords', 'subject_all_caps_ratio',
+        # URL redirect resolution (42-43)
+        'has_redirect_url', 'num_redirect_hops',
     ]
 
     @staticmethod
@@ -100,7 +102,7 @@ class Trainer:
 
         importances = pipeline.classifier.feature_importances_
         top_indices = np.argsort(importances)[-top_n:][::-1]
-        n_numeric = len(Trainer.NUMERIC_FEATURE_NAMES)  # 42 numeric features
+        n_numeric = len(Trainer.NUMERIC_FEATURE_NAMES)
 
         print(f"\nTop {top_n} Most Important Features:")
         for rank, idx in enumerate(top_indices, 1):

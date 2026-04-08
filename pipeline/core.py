@@ -22,12 +22,12 @@ class EmailPhishingPipeline:
     """
     Complete pipeline for email phishing detection.
 
-    Combines preprocessing (34 numeric features) with LSA semantic analysis
-    (up to 768 dimensions) to create rich feature vectors for classification.
+    Combines preprocessing (42 numeric features) with LSA semantic analysis
+    to create rich feature vectors for classification.
     """
 
     def __init__(self,
-                 lsa_components: int = 768,
+                 lsa_components: int = 128,
                  lsa_min_df: int = 2,
                  lsa_max_df: float = 0.85):
         """

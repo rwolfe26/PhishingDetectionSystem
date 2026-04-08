@@ -76,6 +76,10 @@ class EmailFeatures:
     num_auth_keywords: int = 0       # "verify", "confirm", "authenticate", etc.
     subject_all_caps_ratio: float = 0.0  # Fraction of subject words in ALL CAPS
 
+    # ── URL redirect resolution signals ────────────────────────────────────
+    has_redirect_url: int = 0        # Any shortener resolved to a different domain
+    num_redirect_hops: int = 0       # Total redirect hops across all resolved URLs
+
     def to_dict(self) -> Dict[str, float]:
         """Return ordered dict for model input."""
         return {
@@ -128,6 +132,9 @@ class EmailFeatures:
             'greeting_generic': self.greeting_generic,
             'num_auth_keywords': self.num_auth_keywords,
             'subject_all_caps_ratio': self.subject_all_caps_ratio,
+            # URL redirect resolution
+            'has_redirect_url': self.has_redirect_url,
+            'num_redirect_hops': self.num_redirect_hops,
         }
 
     def to_list(self) -> List[float]:
@@ -204,6 +211,13 @@ class FeatureExtractor:
 
     ARCHIVE_EXTENSIONS = {
         '.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.iso', '.cab',
+    }
+
+    # Extensions that appear as the "decoy" first extension in double-extension attacks
+    # e.g. invoice.pdf.exe or report.docx.js
+    _DOUBLE_EXT_DECOYS = {
+        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+        '.txt', '.jpg', '.png', '.mp3', '.mp4',
     }
 
     # Known brand domains for impersonation detection
@@ -376,8 +390,23 @@ class FeatureExtractor:
         features.num_attachments = len(attachments)
 
         for att in attachments:
-            filename = (att.filename or '').lower()
-            if any(filename.endswith(ext) for ext in self.EXECUTABLE_EXTENSIONS):
+            filename = (att.filename or '').lower().strip()
+            if not filename:
+                continue
+
+            is_exec = any(filename.endswith(ext) for ext in self.EXECUTABLE_EXTENSIONS)
+
+            # Double-extension attack: e.g. "invoice.pdf.exe" or "report.docx.js"
+            # Detect by checking whether the second-to-last extension is a known decoy
+            parts = filename.rsplit('.', 2)
+            if not is_exec and len(parts) == 3:
+                decoy_ext = '.' + parts[1]
+                final_ext = '.' + parts[2]
+                if decoy_ext in self._DOUBLE_EXT_DECOYS and \
+                        final_ext in self.EXECUTABLE_EXTENSIONS:
+                    is_exec = True
+
+            if is_exec:
                 features.has_executable_attachment = 1
             if any(filename.endswith(ext) for ext in self.ARCHIVE_EXTENSIONS):
                 features.has_archive_attachment = 1
@@ -479,6 +508,17 @@ class FeatureExtractor:
         if subject_words:
             caps_words = sum(1 for w in subject_words if w.isupper() and len(w) > 1)
             features.subject_all_caps_ratio = round(caps_words / len(subject_words), 4)
+
+        # URL redirect resolution — populated when URLRedirectResolver has been called
+        total_hops = 0
+        any_domain_changed = False
+        for url_info in urls:
+            if url_info.num_redirects > 0:
+                total_hops += url_info.num_redirects
+                if url_info.resolved_domain and url_info.resolved_domain != url_info.domain:
+                    any_domain_changed = True
+        features.has_redirect_url = int(any_domain_changed)
+        features.num_redirect_hops = total_hops
 
     # ── Helpers ─────────────────────────────────────────────────────────────
 

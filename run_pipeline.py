@@ -244,8 +244,8 @@ Examples:
     parser.add_argument('--tune', action='store_true', help='Tune Random Forest hyperparameters')
 
     # Training parameters
-    parser.add_argument('--lsa-components', type=int, default=256,
-                        help='Number of LSA components (default: 256)')
+    parser.add_argument('--lsa-components', type=int, default=128,
+                        help='Number of LSA components (default: 128)')
     parser.add_argument('--lsa-min-df', type=int, default=2,
                         help='Minimum document frequency for LSA (default: 2)')
     parser.add_argument('--lsa-max-df', type=float, default=0.85,

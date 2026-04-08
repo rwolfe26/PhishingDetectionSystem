@@ -7,47 +7,122 @@ Exposes endpoints for classification, explanation, and health checks.
 Usage:
     uvicorn api.main:app --reload
     python api/main.py  (for quick testing)
+
+Environment variables:
+    CORS_ORIGINS  Comma-separated list of allowed origins (default: "*")
+    MODEL_DIR     Path to directory containing trained model files
 """
 
+import json
 import logging
+import os
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
 
-from pipeline import EmailPhishingPipeline, Predictor
+from pipeline import EmailPhishingPipeline
 from preprocessing import preprocess_email_with_lsa
 
 from .explainer import explain_prediction, explain_with_shap, highlight_phishing_indicators
 
+
+# ── Structured JSON logging ──────────────────────────────────────────────────
+
+class _JsonFormatter(logging.Formatter):
+    """Emit log records as single-line JSON objects."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            'time': self.formatTime(record, self.datefmt),
+            'level': record.levelname,
+            'logger': record.name,
+            'message': record.getMessage(),
+        }
+        if record.exc_info:
+            payload['exc_info'] = self.formatException(record.exc_info)
+        extra_keys = {'request_id', 'path', 'method', 'status_code', 'duration_ms'}
+        for key in extra_keys:
+            if hasattr(record, key):
+                payload[key] = getattr(record, key)
+        return json.dumps(payload)
+
+
+def _configure_logging():
+    handler = logging.StreamHandler()
+    handler.setFormatter(_JsonFormatter())
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+
+
+_configure_logging()
 logger = logging.getLogger(__name__)
+
+
+# ── Request-ID middleware ────────────────────────────────────────────────────
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Attach a UUID request-ID to every request and log completion."""
+
+    async def dispatch(self, request: Request, call_next):
+        import time
+        request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
+        request.state.request_id = request_id
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = round((time.perf_counter() - start) * 1000, 1)
+        response.headers['X-Request-ID'] = request_id
+        logger.info(
+            'request',
+            extra={
+                'request_id': request_id,
+                'method': request.method,
+                'path': request.url.path,
+                'status_code': response.status_code,
+                'duration_ms': duration_ms,
+            },
+        )
+        return response
+
+
+# ── Config ───────────────────────────────────────────────────────────────────
+
+MAX_EMAIL_BYTES = 1 * 1024 * 1024  # 1 MB hard limit for email text
+
+_cors_origins_raw = os.environ.get('CORS_ORIGINS', '*')
+_cors_origins = [o.strip() for o in _cors_origins_raw.split(',') if o.strip()] or ['*']
+
+_model_dir = Path(
+    os.environ.get('MODEL_DIR', str(Path(__file__).resolve().parent.parent / 'models'))
+)
 
 # ── Models / state ──────────────────────────────────────────────────────────
 
 _pipeline: Optional[EmailPhishingPipeline] = None
-_predictor: Optional[Predictor] = None
-_model_dir = Path(__file__).resolve().parent.parent / 'models'
 
 
 def _load_pipeline():
-    global _pipeline, _predictor
+    global _pipeline
     if not _model_dir.exists():
-        logger.error("models/ directory not found. Run: python run_pipeline.py --train")
+        logger.error('models/ directory not found — run: python run_pipeline.py --train')
         return False
     try:
         _pipeline = EmailPhishingPipeline()
         _pipeline.load_models(_model_dir)
-        _predictor = Predictor()
-        logger.info("Pipeline loaded successfully")
+        logger.info('pipeline loaded successfully', extra={'model_dir': str(_model_dir)})
         return True
     except Exception as exc:
-        logger.error(f"Failed to load pipeline: {exc}")
+        logger.error('failed to load pipeline', extra={'error': str(exc)})
         return False
 
 
@@ -55,7 +130,7 @@ def _load_pipeline():
 async def lifespan(app: FastAPI):
     loaded = _load_pipeline()
     if not loaded:
-        logger.warning("Running without loaded models — /classify will return 503")
+        logger.warning('running without loaded models — /classify will return 503')
     yield
 
 
@@ -68,9 +143,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -155,6 +231,12 @@ async def classify_email(request: ClassifyRequest):
     if not request.email_text.strip():
         raise HTTPException(status_code=400, detail="email_text must not be empty")
 
+    if len(request.email_text.encode('utf-8')) > MAX_EMAIL_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Email exceeds maximum size of {MAX_EMAIL_BYTES // 1024} KB"
+        )
+
     try:
         result = preprocess_email_with_lsa(request.email_text, _pipeline.lsa_encoder)
         feature_vector = result['combined_vector']
@@ -185,9 +267,11 @@ async def classify_email(request: ClassifyRequest):
             model_loaded=True,
         )
 
+    except HTTPException:
+        raise
     except Exception as exc:
-        logger.exception(f"Error during classification: {exc}")
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.exception('classification error')
+        raise HTTPException(status_code=500, detail="Internal classification error")
 
 
 @app.post("/classify/file")
@@ -196,9 +280,12 @@ async def classify_file(file: UploadFile = File(...), use_shap: bool = False):
     Classify an uploaded .eml or plain text email file.
     """
     content = await file.read()
+    if len(content) > MAX_EMAIL_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds maximum size of {MAX_EMAIL_BYTES // 1024} KB"
+        )
     email_text = content.decode('utf-8', errors='ignore')
-
-    from pydantic import BaseModel as BM
     req = ClassifyRequest(email_text=email_text, use_shap=use_shap)
     return await classify_email(req)
 

@@ -40,38 +40,43 @@ Training on **17,204 emails** (11,306 ham + 5,898 phishing/spam):
 Detection_System/
 ├── run_pipeline.py               # CLI: --train, --predict, --benchmark, --tune
 ├── requirements.txt
+├── Dockerfile                    # Container image for deployment
+├── .github/workflows/ci.yml      # GitHub Actions: pytest + ruff on every push
 │
 ├── pipeline/                     # Modular ML pipeline
-│   ├── core.py                   # EmailPhishingPipeline
+│   ├── core.py                   # EmailPhishingPipeline (default 128 LSA dims)
 │   ├── data_loader.py            # Load emails from dirs, CSV, JSONL
 │   ├── trainer.py                # Train, CV, hyperparameter tune, benchmark
 │   └── predictor.py              # Single-email inference
 │
 ├── preprocessing/                # Email feature extraction
 │   ├── email_parser.py           # RFC 822 / MIME parsing
-│   ├── url_extractor.py          # URL analysis
-│   └── feature_extractor.py     # 42 numeric features
+│   ├── url_extractor.py          # URL analysis + URLRedirectResolver
+│   └── feature_extractor.py     # 44 numeric features
 │
 ├── bert_base/
 │   └── lsa_tool.py               # TF-IDF + TruncatedSVD semantic encoder
 │
 ├── api/                          # FastAPI web application
-│   ├── main.py                   # REST API (/classify, /health)
+│   ├── main.py                   # REST API with JSON logging + request-ID middleware
 │   ├── explainer.py              # Feature importance + SHAP + indicators
 │   └── static/index.html         # Dark-mode SPA frontend
 │
 ├── experiments/
 │   └── lsa_dimension_search.py   # Find optimal LSA component count
 │
-├── models/                       # Saved trained models
+├── models/                       # Saved trained models (run --train to generate)
 ├── Datasets/                     # Email datasets (extracted archives)
-├── tests/                        # 36 pytest tests
+├── tests/                        # 54 pytest tests
+│   ├── test_pipeline.py          # Pipeline, preprocessing, explainer (29 tests)
+│   ├── test_preprocessing.py     # Email parser, URL extractor (7 tests)
+│   └── test_api.py               # FastAPI endpoints + single-pass training (18 tests)
 └── docs/                         # Documentation
 ```
 
 ## Features
 
-### Email Preprocessing (42 Features)
+### Email Preprocessing (44 Features)
 
 | Category | Count | Key signals |
 |----------|-------|-------------|
@@ -82,13 +87,14 @@ Detection_System/
 | HTML analysis | 6 | Forms, iframes, hidden text |
 | Attachments | 3 | Executables, archives |
 | Phishing signals | 10 | Brand impersonation score, homograph chars, urgency density, generic greeting |
+| URL redirect resolution | 2 | Final domain after redirect, total redirect hops |
 
 ### LSA Semantic Analysis
 
 - **TF-IDF Vectorisation** with bigrams
 - **Truncated SVD** — 128 dimensions by default (tunable via `--lsa-components`)
 - **L2 Normalisation** for length-independent embeddings
-- Combined vector: 42 numeric + 128 LSA = **170 total features**
+- Combined vector: 44 numeric + 128 LSA = **172 total features**
 
 ### Classification
 
@@ -124,7 +130,7 @@ curl -X POST http://localhost:8000/classify \
 ## Testing
 
 ```bash
-python -m pytest tests/ -v    # 36 tests
+python -m pytest tests/ -v    # 54 tests
 ```
 
 ## Documentation
@@ -151,17 +157,40 @@ All archives in `Datasets/` are pre-extracted and ready to use:
 
 Additional CSV/ZIP datasets in `Datasets/` are available but not currently used by the default pipeline.
 
+## API Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CORS_ORIGINS` | `*` | Comma-separated allowed origins (e.g. `https://myapp.com`) |
+| `MODEL_DIR` | `./models` | Path to directory containing trained `.pkl` model files |
+
+## Deployment
+
+**Local (uvicorn):**
+```bash
+uvicorn api.main:app --reload
+```
+
+**Docker:**
+```bash
+docker build -t phishing-detector .
+# Mount your trained models and run
+docker run -p 8000:8000 -v $(pwd)/models:/app/models phishing-detector
+```
+
 ## Roadmap
 
-### Phase 1 (In Progress)
-- [x] 42-feature engineering pipeline
+### Phase 1 (Complete)
+- [x] 44-feature engineering pipeline (42 → 44 with redirect resolution features)
 - [x] Multi-dataset training (17k+ emails)
 - [x] Classifier benchmarking + hyperparameter tuning
 - [x] Cross-validation + error analysis
 - [x] FastAPI backend + web frontend
 - [x] Feature importance + SHAP explainability
-- [ ] URL expansion / redirect resolution
-- [ ] Enhanced attachment sandboxing
+- [x] URL redirect resolver (`URLRedirectResolver` — follows shorteners to final domain)
+- [x] Enhanced attachment analysis (double-extension detection)
+- [x] Structured JSON logging + request-ID middleware
+- [x] CI pipeline (GitHub Actions) + Dockerfile
 
 ### Phase 2 (Planned)
 - [ ] Gmail / IMAP integration (read-only OAuth)

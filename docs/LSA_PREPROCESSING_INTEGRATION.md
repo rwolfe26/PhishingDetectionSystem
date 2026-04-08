@@ -79,7 +79,7 @@ lsa = joblib.load('models/lsa_encoder.pkl')
 result = preprocess_email_with_lsa(raw_email, lsa)
 
 print(result['lsa_embedding'].shape)    # (128,)
-print(result['combined_vector'].shape)  # (170,)  → 42 numeric + 128 LSA
+print(result['combined_vector'].shape)  # (172,)  → 44 numeric + 128 LSA
 ```
 
 ### Batch Processing
@@ -89,7 +89,7 @@ from preprocessing import preprocess_email_batch_with_lsa
 import numpy as np
 
 results = preprocess_email_batch_with_lsa(email_list, lsa)
-X = np.array([r['combined_vector'] for r in results])  # (n_emails, 42+N)
+X = np.array([r['combined_vector'] for r in results])  # (n_emails, 44+N)
 ```
 
 ### Single-Pass Fit + Extract (Most Efficient)
@@ -101,7 +101,7 @@ from preprocessing import fit_and_extract_features
 X, body_texts = fit_and_extract_features(train_emails, lsa)
 ```
 
-## The 42 Numeric Features
+## The 44 Numeric Features
 
 | Category | Count | Examples |
 |----------|-------|---------|
@@ -112,6 +112,7 @@ X, body_texts = fit_and_extract_features(train_emails, lsa)
 | HTML | 6 | `has_form`, `has_iframe`, `has_hidden_text` |
 | Attachments | 3 | `has_executable_attachment`, `has_archive_attachment` |
 | Phishing-specific | 10 | `num_homograph_chars`, `urgency_density`, `greeting_generic`, `subject_all_caps_ratio` |
+| URL redirect resolution | 2 | `has_redirect_url`, `num_redirect_hops` |
 
 Get the ordered list of feature names at runtime:
 

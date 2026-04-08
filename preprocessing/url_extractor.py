@@ -6,8 +6,9 @@ Provides URL metadata useful for phishing detection.
 """
 
 import re
+import threading
 from dataclasses import dataclass, field
-from typing import List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse, parse_qs
 import html.parser
 
@@ -24,7 +25,7 @@ class URLInfo:
     query: str = ""
     fragment: str = ""
     port: Optional[int] = None
-    
+
     # Analysis fields
     anchor_text: str = ""  # Link text (if from HTML)
     is_ip_address: bool = False
@@ -36,6 +37,101 @@ class URLInfo:
     uses_https: bool = False
     has_suspicious_port: bool = False
     query_param_count: int = 0
+
+    # Redirect resolution fields (populated by URLRedirectResolver)
+    resolved_url: str = ""       # Final URL after following redirects
+    resolved_domain: str = ""    # Domain of the final URL
+    num_redirects: int = 0       # Number of HTTP redirects followed
+
+
+# ── URL Redirect Resolver ────────────────────────────────────────────────────
+
+class URLRedirectResolver:
+    """
+    Resolves URL shorteners to their final destination via HTTP HEAD requests.
+
+    Uses a process-level cache to avoid resolving the same URL twice within
+    a training run or API session.
+
+    Resolution is opt-in; use resolve_shorteners() to expand a batch of URLInfo
+    objects in place. Each resolution is guarded by a configurable timeout and
+    silently skipped on any network error.
+    """
+
+    _cache: Dict[str, Tuple[str, int]] = {}  # url -> (resolved_url, num_redirects)
+    _lock = threading.Lock()
+
+    DEFAULT_TIMEOUT = 4  # seconds per HEAD request
+    MAX_REDIRECTS = 10
+
+    @classmethod
+    def resolve(cls, url: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple[str, int]:
+        """
+        Follow redirects from `url` and return (final_url, num_redirects).
+
+        Returns the original url with 0 redirects if resolution fails.
+        """
+        with cls._lock:
+            if url in cls._cache:
+                return cls._cache[url]
+
+        try:
+            import requests
+        except ImportError:
+            return url, 0
+
+        try:
+            resp = requests.head(
+                url,
+                allow_redirects=True,
+                timeout=timeout,
+                headers={'User-Agent': 'Mozilla/5.0 (compatible; PhishDetect/1.0)'},
+            )
+            final_url = resp.url
+            # Count actual redirects from the history
+            num_redirects = len(resp.history)
+        except Exception:
+            final_url = url
+            num_redirects = 0
+
+        result = (final_url, num_redirects)
+        with cls._lock:
+            cls._cache[url] = result
+        return result
+
+    @classmethod
+    def resolve_shorteners(
+        cls,
+        urls: List[URLInfo],
+        shortener_domains: Set[str],
+        timeout: int = DEFAULT_TIMEOUT,
+    ) -> None:
+        """
+        Resolve shortener URLs in-place, populating resolved_url, resolved_domain,
+        and num_redirects on each matching URLInfo.
+
+        Args:
+            urls: List of URLInfo objects (mutated in place)
+            shortener_domains: Set of domain strings considered URL shorteners
+            timeout: Per-request timeout in seconds
+        """
+        for url_info in urls:
+            if url_info.domain.lower() not in shortener_domains:
+                continue
+            final_url, hops = cls.resolve(url_info.raw_url, timeout=timeout)
+            url_info.resolved_url = final_url
+            url_info.num_redirects = hops
+            try:
+                parsed = urlparse(final_url)
+                url_info.resolved_domain = (parsed.hostname or '').lower()
+            except Exception:
+                url_info.resolved_domain = ''
+
+    @classmethod
+    def clear_cache(cls) -> None:
+        """Clear the in-process resolution cache (useful for testing)."""
+        with cls._lock:
+            cls._cache.clear()
 
 
 class HTMLLinkParser(html.parser.HTMLParser):

@@ -60,6 +60,8 @@ FEATURE_DESCRIPTIONS = {
     'greeting_generic': 'Generic greeting ("Dear Customer")',
     'num_auth_keywords': 'Authentication action keywords',
     'subject_all_caps_ratio': 'Fraction of ALL CAPS words in subject',
+    'has_redirect_url': 'Shortener URL resolved to a different final domain',
+    'num_redirect_hops': 'Total redirect hops across resolved shortener URLs',
 }
 
 

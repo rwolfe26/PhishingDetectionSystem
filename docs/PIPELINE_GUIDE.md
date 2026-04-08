@@ -6,7 +6,7 @@ This guide covers training, prediction, benchmarking, and tuning for the phishin
 
 The pipeline integrates three layers:
 
-1. **Email Preprocessing** (42 numeric features)
+1. **Email Preprocessing** (44 numeric features)
    - URL analysis (IP addresses, HTTPS, suspicious ports, shorteners, homographs, brand Levenshtein)
    - Text analysis (word counts, character stats, urgency density)
    - Keyword analysis (urgency, credential, action, and auth keywords)
@@ -21,7 +21,7 @@ The pipeline integrates three layers:
    - L2 normalisation for stability
 
 3. **Random Forest Classifier**
-   - Trained on combined feature vectors (42 numeric + N LSA dims)
+   - Trained on combined feature vectors (44 numeric + N LSA dims)
    - Provides probability scores for risk assessment
    - `class_weight='balanced'` handles class imbalance automatically
 
@@ -67,11 +67,11 @@ This will:
 
 ```bash
 python run_pipeline.py --train \
-  --lsa-components 256 \      # LSA dimensions (default: 128)
+  --lsa-components 256 \      # LSA dimensions (default: 128, trained models use 128)
   --lsa-min-df 2 \            # Minimum document frequency (default: 2)
   --lsa-max-df 0.85 \         # Maximum document frequency (default: 0.85)
   --test-size 0.2 \           # Test set proportion (default: 0.2)
-  --csv-samples 3000 \        # Max phishing/safe samples from CSV (default: 1500)
+  --csv-samples 3000 \        # Max phishing/safe samples from CSV (default: 5000)
   --cross-validate \          # Run stratified 5-fold CV before final training
   --cv-folds 5 \              # Number of CV folds (default: 5)
   --error-analysis            # Save misclassified emails to error_analysis.txt
@@ -188,7 +188,7 @@ Detection_System/
 └── docs/                         # Documentation
 ```
 
-### Feature List (42 numeric features)
+### Feature List (44 numeric features)
 
 **URL features (10):** `num_urls`, `num_unique_domains`, `has_ip_url`, `no_https_ratio`, `avg_url_length`, `max_url_length`, `avg_path_depth`, `total_dots_in_urls`, `has_at_symbol_url`, `has_suspicious_port`
 
@@ -203,6 +203,8 @@ Detection_System/
 **Attachment features (3):** `num_attachments`, `has_executable_attachment`, `has_archive_attachment`
 
 **Phishing-specific signals (10):** `spf_dkim_fail`, `sender_domain_mismatch`, `num_homograph_chars`, `brand_impersonation_score`, `urgency_density`, `html_text_ratio`, `num_shortener_urls`, `greeting_generic`, `num_auth_keywords`, `subject_all_caps_ratio`
+
+**URL redirect resolution (2):** `has_redirect_url`, `num_redirect_hops`
 
 ## Using the Pipeline Programmatically
 

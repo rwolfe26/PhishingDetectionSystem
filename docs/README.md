@@ -29,7 +29,7 @@ Comprehensive guide to using the complete pipeline:
 - Installation instructions
 - Training workflow
 - Prediction workflow
-- Feature breakdown (34 numeric + LSA dimensions)
+- Feature breakdown (42 numeric + LSA dimensions)
 - Performance tips and troubleshooting
 - Advanced usage patterns
 
@@ -48,7 +48,7 @@ Comprehensive guide to using the complete pipeline:
 Technical documentation on how LSA semantic analysis integrates with preprocessing:
 - Architecture overview
 - Integration functions (`fit_lsa_encoder`, `preprocess_email_with_lsa`)
-- Combined feature vector composition (34 + N dimensions)
+- Combined feature vector composition (42 + N dimensions)
 - Usage examples and code snippets
 - Troubleshooting LSA issues
 

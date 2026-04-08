@@ -168,12 +168,12 @@ class TestFeatureExtractor:
 
     def test_feature_names_count(self):
         names = EmailFeatures.feature_names()
-        assert len(names) == 42, f"Expected 42 features, got {len(names)}"
+        assert len(names) == 44, f"Expected 44 features, got {len(names)}"
 
     def test_empty_email(self):
         result = preprocess_email(EMPTY_EMAIL)
         assert isinstance(result['feature_vector'], list)
-        assert len(result['feature_vector']) == 42
+        assert len(result['feature_vector']) == 44
 
     def test_html_only_email(self):
         result = preprocess_email(HTML_ONLY_EMAIL)
@@ -218,7 +218,8 @@ class TestLSAEncoder:
         lsa = fit_lsa_encoder(emails, n_components=15, min_df=1)
         result = preprocess_email_with_lsa(HAM_EMAIL, lsa)
         vec = result['combined_vector']
-        assert vec.shape == (42 + 15,), f"Expected (57,), got {vec.shape}"
+        n_numeric = len(EmailFeatures.feature_names())
+        assert vec.shape == (n_numeric + 15,), f"Expected ({n_numeric + 15},), got {vec.shape}"
 
     def test_transform_single(self):
         # Use diverse emails and min_df=1 with enough unique tokens
@@ -326,7 +327,8 @@ class TestPipeline:
 
     def test_feature_dim_consistency(self):
         pipeline, emails, _, X = _make_mini_pipeline(lsa_components=15)
-        assert X.shape[1] == 42 + 15  # 42 numeric + 15 LSA
+        n_numeric = len(EmailFeatures.feature_names())
+        assert X.shape[1] == n_numeric + 15  # numeric features + 15 LSA dims
 
     def test_empty_email_prediction(self):
         pipeline, _, _, _ = _make_mini_pipeline()
@@ -376,7 +378,7 @@ class TestTrainer:
         assert output_path.exists()
 
     def test_feature_names_match_n_numeric(self):
-        assert len(TrainerClass.NUMERIC_FEATURE_NAMES) == 42
+        assert len(TrainerClass.NUMERIC_FEATURE_NAMES) == 44
 
 
 # ── Explainability tests ─────────────────────────────────────────────────────

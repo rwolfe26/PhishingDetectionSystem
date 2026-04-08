@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.git/
+Datasets/
+spamassassin_data/
+old_models/
+error_analysis.txt
+experiments/lsa_dimension_results.csv

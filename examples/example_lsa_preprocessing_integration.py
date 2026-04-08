@@ -36,10 +36,10 @@ def load_emails_from_directory(directory: Path, limit: int = None):
 
 
 def main():
-    # Define paths
-    base_dir = Path(__file__).parent
+    # Define paths (resolve to repo root, not examples/)
+    base_dir = Path(__file__).resolve().parent.parent
     ham_dir = base_dir / 'Datasets' / 'easy_ham'
-    spam_dir = base_dir / 'Datasets' / 'spam'  # If you have spam data
+    spam_dir = base_dir / 'Datasets' / 'spam'
 
     print("=" * 60)
     print("LSA + Preprocessing Integration Example")
@@ -96,7 +96,7 @@ def main():
     print("\n[Step 6] Saving the LSA encoder...")
     try:
         import joblib
-        encoder_path = base_dir / 'lsa_encoder_768d.pkl'
+        encoder_path = base_dir / 'models' / 'lsa_encoder_768d.pkl'
         joblib.dump(lsa_encoder, encoder_path)
         print(f"Encoder saved to: {encoder_path}")
         print("\nTo load later:")

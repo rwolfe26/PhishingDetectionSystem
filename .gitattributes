@@ -1,0 +1,6 @@
+# Tell GitHub Linguist to ignore non-code directories so that
+# the repository language stats reflect actual source code.
+
+Datasets/**        linguist-vendored
+spamassassin_data/** linguist-vendored
+old_models/**      linguist-vendored

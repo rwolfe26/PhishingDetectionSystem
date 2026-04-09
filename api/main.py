@@ -109,6 +109,10 @@ _monitor_db = Path(
     os.environ.get('MONITOR_DB', str(Path(__file__).resolve().parent.parent / 'monitor.db'))
 )
 
+_feedback_db = Path(
+    os.environ.get('FEEDBACK_DB', str(Path(__file__).resolve().parent.parent / 'feedback.db'))
+)
+
 # ── Models / state ──────────────────────────────────────────────────────────
 
 _pipeline: Optional[EmailPhishingPipeline] = None
@@ -245,6 +249,62 @@ async def monitor_history(limit: int = 50):
     except Exception as exc:
         logger.exception("monitor_history error")
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/feedback")
+async def submit_feedback(request: Request):
+    """
+    Record user feedback on a classification result.
+
+    Body: { email_text, predicted, correct_label, confidence? }
+    """
+    try:
+        body = await request.json()
+        email_text    = str(body.get("email_text", "")).strip()
+        predicted     = str(body.get("predicted", "")).strip()
+        correct_label = str(body.get("correct_label", "")).strip()
+        confidence    = float(body.get("confidence", 0.0))
+
+        if not email_text:
+            raise HTTPException(status_code=400, detail="email_text is required")
+        if predicted not in ("phishing", "benign"):
+            raise HTTPException(status_code=400, detail="predicted must be 'phishing' or 'benign'")
+        if correct_label not in ("phishing", "benign"):
+            raise HTTPException(status_code=400, detail="correct_label must be 'phishing' or 'benign'")
+
+        from email_monitor.feedback import FeedbackStore
+        store = FeedbackStore(str(_feedback_db))
+        store.record(email_text, predicted, correct_label, confidence)
+
+        was_correct = predicted == correct_label
+        logger.info(
+            "feedback received",
+            extra={"predicted": predicted, "correct_label": correct_label,
+                   "was_correct": was_correct},
+        )
+        return {"success": True, "was_correct": was_correct}
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("feedback error")
+        raise HTTPException(status_code=500, detail="Failed to store feedback")
+
+
+@app.get("/api/feedback/stats")
+async def feedback_stats():
+    """Return aggregate feedback counts."""
+    if not _feedback_db.exists():
+        return {"total": 0, "corrections": 0, "confirmations": 0, "db_exists": False}
+    try:
+        from email_monitor.feedback import FeedbackStore
+        store = FeedbackStore(str(_feedback_db))
+        stats = store.stats()
+        stats["db_exists"] = True
+        return stats
+    except Exception:
+        logger.exception("feedback_stats error")
+        raise HTTPException(status_code=500, detail="Failed to read feedback stats")
 
 
 @app.get("/health")

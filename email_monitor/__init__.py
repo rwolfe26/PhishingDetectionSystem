@@ -8,5 +8,6 @@ stores results in SQLite, and prints colour-coded terminal alerts.
 from .imap_client import IMAPClient
 from .storage import ClassificationStore
 from .monitor import EmailMonitor
+from .feedback import FeedbackStore
 
-__all__ = ["EmailMonitor", "ClassificationStore", "IMAPClient"]
+__all__ = ["EmailMonitor", "ClassificationStore", "IMAPClient", "FeedbackStore"]

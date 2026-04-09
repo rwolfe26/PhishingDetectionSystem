@@ -263,6 +263,17 @@
     <div class="stat-card"><div class="stat-label">Detection rate</div><div class="stat-value warning" id="s-rate">—</div><div class="stat-sub" id="s-rate-sub"></div></div>
   </div>
 
+  <!-- Feedback stats -->
+  <div style="width:100%;max-width:960px;margin-bottom:28px;">
+    <div style="font-size:0.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">User Feedback</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;" id="fb-grid">
+      <div class="stat-card"><div class="stat-label">Total feedback</div><div class="stat-value" id="fb-total">—</div></div>
+      <div class="stat-card"><div class="stat-label">Corrections</div><div class="stat-value danger" id="fb-corrections">—</div><div class="stat-sub">model was wrong</div></div>
+      <div class="stat-card"><div class="stat-label">Confirmations</div><div class="stat-value safe" id="fb-confirmations">—</div><div class="stat-sub">model was right</div></div>
+    </div>
+    <div style="margin-top:10px;font-size:0.78rem;color:var(--muted);" id="fb-retrain-hint"></div>
+  </div>
+
   <!-- History table -->
   <div class="table-card">
     <div class="table-card-header">
@@ -276,6 +287,24 @@
 
 <script>
   const API = window.location.origin;
+
+  async function loadFeedbackStats() {
+    try {
+      const r = await fetch(`${API}/api/feedback/stats`);
+      const d = await r.json();
+      document.getElementById('fb-total').textContent         = d.total ?? '—';
+      document.getElementById('fb-corrections').textContent   = d.corrections ?? '—';
+      document.getElementById('fb-confirmations').textContent = d.confirmations ?? '—';
+      const hint = document.getElementById('fb-retrain-hint');
+      if (d.corrections > 0) {
+        hint.textContent =
+          `💡 ${d.corrections} correction(s) pending — run: python run_pipeline.py --train --include-feedback`;
+        hint.style.color = 'var(--warning)';
+      } else {
+        hint.textContent = d.total > 0 ? '✓ No corrections pending.' : '';
+      }
+    } catch (e) { console.error('feedback stats error', e); }
+  }
 
   async function loadStats() {
     try {
@@ -370,7 +399,7 @@
   }
 
   async function loadAll() {
-    await Promise.all([loadStats(), loadHistory()]);
+    await Promise.all([loadStats(), loadHistory(), loadFeedbackStats()]);
     const label = document.getElementById('refresh-label');
     const ts = new Date().toLocaleTimeString();
     label.textContent = `Last updated ${ts}  •  Auto-refreshes every 30 s`;

@@ -72,6 +72,23 @@ def train_pipeline(args):
         all_labels.extend(jsonl_labels)
         print(f"Added {len(jsonl_emails)} emails from JSONL dataset")
 
+    # Include user feedback corrections if requested
+    if getattr(args, 'include_feedback', False):
+        feedback_db = base_dir / 'feedback.db'
+        if feedback_db.exists():
+            from email_monitor.feedback import FeedbackStore
+            fb_store = FeedbackStore(str(feedback_db))
+            corrections = fb_store.corrections()
+            if corrections:
+                fb_emails, fb_label_ints = zip(*corrections)
+                emails.extend(fb_emails)
+                all_labels.extend(fb_label_ints)
+                print(f"Added {len(corrections)} correction(s) from feedback.db")
+            else:
+                print("No corrections found in feedback.db — skipping.")
+        else:
+            print("feedback.db not found — skipping --include-feedback.")
+
     labels = np.array(all_labels)
     unique, counts = np.unique(labels, return_counts=True)
     total = len(emails)
@@ -254,6 +271,10 @@ Examples:
                         help='Test set size (default: 0.2)')
     parser.add_argument('--csv-samples', type=int, default=5000,
                         help='Max samples to load from Phishing_Email.csv (default: 5000)')
+
+    # Feedback / active learning
+    parser.add_argument('--include-feedback', action='store_true',
+                        help='Merge user corrections from feedback.db into training data')
 
     # Evaluation options
     parser.add_argument('--cross-validate', action='store_true',

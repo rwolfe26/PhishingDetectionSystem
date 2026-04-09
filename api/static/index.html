@@ -287,6 +287,24 @@
 
     .empty-indicators { color: var(--text-muted); font-size: 0.85rem; font-style: italic; }
 
+    .fb-btn {
+      padding: 6px 14px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .fb-btn:hover        { background: var(--border); }
+    .fb-btn:disabled     { opacity: 0.45; cursor: default; }
+    .fb-yes:hover        { border-color: var(--safe);   color: var(--safe); }
+    .fb-no:hover         { border-color: var(--danger); color: var(--danger); }
+    .fb-submit           { border-color: var(--accent); color: var(--accent); }
+    .fb-submit:hover     { background: rgba(99,102,241,.15); }
+
     /* Loading */
     .spinner {
       display: inline-block;
@@ -392,6 +410,26 @@
     <!-- Phishing indicators -->
     <div class="section-title">Detected Phishing Indicators</div>
     <div id="indicators-panel"></div>
+
+    <!-- Feedback widget -->
+    <div id="feedback-widget" style="display:none;margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
+      <div id="feedback-prompt" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-size:0.85rem;color:var(--text-muted);">Was this classification correct?</span>
+        <button onclick="submitFeedback(true)"  id="fb-yes" class="fb-btn fb-yes">👍 Yes</button>
+        <button onclick="showCorrection()" id="fb-no"  class="fb-btn fb-no">👎 No</button>
+      </div>
+      <div id="feedback-correction" style="display:none;margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:0.85rem;color:var(--text-muted);">It should be:</span>
+        <select id="fb-correct-label" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:0.85rem;">
+          <option value="phishing">Phishing</option>
+          <option value="benign">Benign / Safe</option>
+        </select>
+        <button onclick="submitFeedback(false)" class="fb-btn fb-submit">Submit correction</button>
+      </div>
+      <div id="feedback-thanks" style="display:none;font-size:0.85rem;color:var(--safe);margin-top:10px;">
+        ✓ Thanks — your feedback helps improve the model.
+      </div>
+    </div>
   </div>
 </div>
 
@@ -400,6 +438,7 @@
 
   let currentTab = 'paste';
   let uploadedFile = null;
+  let _uploadedFileText = '';
   let maxImportance = 0;
 
   function switchTab(tab, btn) {
@@ -414,6 +453,9 @@
     uploadedFile = event.target.files[0];
     if (uploadedFile) {
       document.getElementById('file-name').textContent = uploadedFile.name;
+      const reader = new FileReader();
+      reader.onload = e => { _uploadedFileText = e.target.result || ''; };
+      reader.readAsText(uploadedFile);
     }
   }
 
@@ -577,10 +619,68 @@
     }
 
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Show the feedback widget for this result
+    const emailText = currentTab === 'paste'
+      ? (document.getElementById('email-text').value || '')
+      : (_uploadedFileText || '');
+    _showFeedback(emailText, data.prediction, data.confidence);
   }
 
   function escapeHtml(text) {
     return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Feedback logic ──────────────────────────────────────────────────────
+  let _lastEmailText  = '';
+  let _lastPrediction = '';
+  let _lastConfidence = 0;
+
+  function _showFeedback(emailText, prediction, confidence) {
+    _lastEmailText  = emailText;
+    _lastPrediction = prediction;
+    _lastConfidence = confidence;
+    // Pre-select the opposite label as the default correction
+    const opposite = prediction === 'phishing' ? 'benign' : 'phishing';
+    document.getElementById('fb-correct-label').value = opposite;
+    document.getElementById('feedback-widget').style.display = 'block';
+    document.getElementById('feedback-prompt').style.display = 'flex';
+    document.getElementById('feedback-correction').style.display = 'none';
+    document.getElementById('feedback-thanks').style.display = 'none';
+    document.getElementById('fb-yes').disabled = false;
+    document.getElementById('fb-no').disabled  = false;
+  }
+
+  function showCorrection() {
+    document.getElementById('fb-no').disabled = true;
+    document.getElementById('feedback-correction').style.display = 'flex';
+  }
+
+  async function submitFeedback(wasCorrect) {
+    const correctLabel = wasCorrect
+      ? _lastPrediction
+      : document.getElementById('fb-correct-label').value;
+
+    // Disable both buttons immediately
+    document.getElementById('fb-yes').disabled = true;
+    document.getElementById('fb-no').disabled  = true;
+
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email_text:    _lastEmailText,
+          predicted:     _lastPrediction,
+          correct_label: correctLabel,
+          confidence:    _lastConfidence,
+        }),
+      });
+    } catch (e) { console.warn('Feedback submit failed', e); }
+
+    document.getElementById('feedback-prompt').style.display    = 'none';
+    document.getElementById('feedback-correction').style.display = 'none';
+    document.getElementById('feedback-thanks').style.display    = 'block';
   }
 </script>
 </body>

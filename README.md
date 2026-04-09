@@ -205,4 +205,4 @@ docker run -p 8000:8000 -v $(pwd)/models:/app/models phishing-detector
 
 ## License
 
-[Add your license here]
+MIT

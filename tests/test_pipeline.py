@@ -166,12 +166,12 @@ class TestFeatureExtractor:
 
     def test_feature_names_count(self):
         names = EmailFeatures.feature_names()
-        assert len(names) == 44, f"Expected 44 features, got {len(names)}"
+        assert len(names) == 47, f"Expected 47 features, got {len(names)}"
 
     def test_empty_email(self):
         result = preprocess_email(EMPTY_EMAIL)
         assert isinstance(result['feature_vector'], list)
-        assert len(result['feature_vector']) == 44
+        assert len(result['feature_vector']) == 47
 
     def test_html_only_email(self):
         result = preprocess_email(HTML_ONLY_EMAIL)
@@ -376,7 +376,7 @@ class TestTrainer:
         assert output_path.exists()
 
     def test_feature_names_match_n_numeric(self):
-        assert len(TrainerClass.NUMERIC_FEATURE_NAMES) == 44
+        assert len(TrainerClass.NUMERIC_FEATURE_NAMES) == 47
 
 
 # ── Explainability tests ─────────────────────────────────────────────────────

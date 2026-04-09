@@ -35,6 +35,9 @@ class EmailFeatures:
     num_unique_words: int = 0
     num_chars: int = 0
     num_special_chars: int = 0
+    special_char_ratio: float = 0.0   # special chars / total chars (length-independent)
+    unique_word_ratio: float = 0.0    # unique words / total words (lexical diversity)
+    caps_ratio: float = 0.0           # uppercase letters / total letters
 
     # ── Urgency / phishing keyword features ────────────────────────────────
     num_urgent_keywords: int = 0
@@ -97,6 +100,9 @@ class EmailFeatures:
             'num_unique_words': self.num_unique_words,
             'num_chars': self.num_chars,
             'num_special_chars': self.num_special_chars,
+            'special_char_ratio': self.special_char_ratio,
+            'unique_word_ratio': self.unique_word_ratio,
+            'caps_ratio': self.caps_ratio,
             # Keywords
             'num_urgent_keywords': self.num_urgent_keywords,
             'num_credential_keywords': self.num_credential_keywords,
@@ -305,6 +311,15 @@ class FeatureExtractor:
         features.num_unique_words = len(set(words))
         features.num_chars = len(text)
         features.num_special_chars = len(re.findall(r'[^a-zA-Z0-9\s]', text))
+
+        # Length-independent ratios — these give the model scale-free signals
+        if features.num_chars > 0:
+            features.special_char_ratio = round(features.num_special_chars / features.num_chars, 6)
+            letters = re.findall(r'[a-zA-Z]', text)
+            upper = re.findall(r'[A-Z]', text)
+            features.caps_ratio = round(len(upper) / len(letters), 6) if letters else 0.0
+        if features.num_words > 0:
+            features.unique_word_ratio = round(features.num_unique_words / features.num_words, 6)
 
     def _extract_keyword_features(self, parsed_email: ParsedEmail, features: EmailFeatures):
         text = ' '.join([

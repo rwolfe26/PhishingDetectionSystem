@@ -76,12 +76,12 @@ Detection_System/
 
 ## Features
 
-### Email Preprocessing (44 Features)
+### Email Preprocessing (47 Features)
 
 | Category | Count | Key signals |
 |----------|-------|-------------|
 | URL analysis | 10 | IP URLs, HTTPS ratio, shorteners (bit.ly etc.), brand Levenshtein distance |
-| Text analysis | 4 | Word count, character stats |
+| Text analysis | 7 | Word count, character stats, special-char ratio, unique-word ratio, caps ratio |
 | Keyword analysis | 3 | Urgency, credential, action keywords |
 | Header analysis | 6 | Reply-To mismatch, SPF/DKIM fail, sender display-name spoofing |
 | HTML analysis | 6 | Forms, iframes, hidden text |
@@ -94,7 +94,7 @@ Detection_System/
 - **TF-IDF Vectorisation** with bigrams
 - **Truncated SVD** — 128 dimensions by default (tunable via `--lsa-components`)
 - **L2 Normalisation** for length-independent embeddings
-- Combined vector: 44 numeric + 128 LSA = **172 total features**
+- Combined vector: 47 numeric + 128 LSA = **175 total features**
 
 ### Classification
 
@@ -181,7 +181,7 @@ docker run -p 8000:8000 -v $(pwd)/models:/app/models phishing-detector
 ## Roadmap
 
 ### Phase 1 (Complete)
-- [x] 44-feature engineering pipeline (42 → 44 with redirect resolution features)
+- [x] 47-feature engineering pipeline (44 → 47 with length-independent ratio features)
 - [x] Multi-dataset training (17k+ emails)
 - [x] Classifier benchmarking + hyperparameter tuning
 - [x] Cross-validation + error analysis

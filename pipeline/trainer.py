@@ -34,25 +34,26 @@ class Trainer:
         'num_urls', 'num_unique_domains', 'has_ip_url', 'no_https_ratio',
         'avg_url_length', 'max_url_length', 'avg_path_depth', 'total_dots_in_urls',
         'has_at_symbol_url', 'has_suspicious_port',
-        # Text features (10-13)
+        # Text features (10-16)
         'num_words', 'num_unique_words', 'num_chars', 'num_special_chars',
-        # Keyword features (14-16)
+        'special_char_ratio', 'unique_word_ratio', 'caps_ratio',
+        # Keyword features (17-19)
         'num_urgent_keywords', 'num_credential_keywords', 'num_action_keywords',
-        # Header features (17-22)
+        # Header features (20-25)
         'has_reply_to_mismatch', 'has_return_path_mismatch', 'num_received_hops',
         'has_suspicious_mailer', 'subject_has_urgent', 'subject_has_re_fw',
-        # HTML features (23-28)
+        # HTML features (26-31)
         'has_html', 'has_form', 'has_iframe', 'has_hidden_text',
         'num_external_links', 'link_text_url_mismatch',
-        # Attachment features (29-31)
+        # Attachment features (32-34)
         'num_attachments', 'has_executable_attachment', 'has_archive_attachment',
-        # Phishing-specific signals (32-41)
+        # Phishing-specific signals (35-44)
         'spf_dkim_fail', 'sender_domain_mismatch',
         'num_homograph_chars', 'brand_impersonation_score',
         'urgency_density', 'html_text_ratio',
         'num_shortener_urls', 'greeting_generic',
         'num_auth_keywords', 'subject_all_caps_ratio',
-        # URL redirect resolution (42-43)
+        # URL redirect resolution (45-46)
         'has_redirect_url', 'num_redirect_hops',
     ]
 

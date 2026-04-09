@@ -7,10 +7,8 @@ and dedicated phishing signals (brand impersonation, SPF/DKIM, urgency density, 
 """
 
 import re
-import unicodedata
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
-from collections import Counter
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 from .email_parser import ParsedEmail
 from .url_extractor import URLInfo, URLExtractor, get_unique_domains

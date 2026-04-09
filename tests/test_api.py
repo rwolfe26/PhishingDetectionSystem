@@ -18,7 +18,6 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from pipeline import EmailPhishingPipeline, Trainer
-from preprocessing import preprocess_email_with_lsa, fit_lsa_encoder
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -224,7 +223,7 @@ class TestRequestID:
 class TestSinglePassExtraction:
     def test_fit_lsa_and_extract_shape_matches_extract_features(self):
         emails = [HAM_EMAIL] * 20 + [PHISHING_EMAIL] * 20
-        labels = np.array([0] * 20 + [1] * 20)
+        np.array([0] * 20 + [1] * 20)
 
         lsa_components = 10
 

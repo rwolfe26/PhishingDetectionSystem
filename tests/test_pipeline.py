@@ -5,9 +5,7 @@ Tests for the full EmailPhishingPipeline, DataLoader, Trainer, and Predictor.
 Covers training, prediction, model persistence, edge cases, and new features.
 """
 
-import os
 import sys
-import tempfile
 from pathlib import Path
 
 import numpy as np

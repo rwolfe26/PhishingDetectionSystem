@@ -124,7 +124,7 @@ def train_pipeline(args):
     print("Pipeline Training Complete!")
     print(f"{'='*60}")
     print(f"Models saved to: {output_dir}")
-    print(f"To predict: python run_pipeline.py --predict <email_file>")
+    print("To predict: python run_pipeline.py --predict <email_file>")
 
 
 def predict_email(args):

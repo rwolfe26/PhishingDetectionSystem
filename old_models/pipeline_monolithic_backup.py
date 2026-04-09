@@ -250,18 +250,18 @@ class EmailPhishingPipeline:
         print(f"Recall: {recall:.4f}")
         print(f"F1-Score: {f1:.4f}")
 
-        print(f"\nConfusion Matrix:")
-        print(f"                 Predicted")
-        print(f"                Ham    Spam")
+        print("\nConfusion Matrix:")
+        print("                 Predicted")
+        print("                Ham    Spam")
         print(f"Actual  Ham    {tn:5d}  {fp:5d}")
         print(f"        Spam   {fn:5d}  {tp:5d}")
 
-        print(f"\nDetailed Classification Report:")
+        print("\nDetailed Classification Report:")
         print(classification_report(y_test, y_pred,
                                    target_names=['Ham', 'Spam']))
 
         # False positives and false negatives analysis
-        print(f"\nError Analysis:")
+        print("\nError Analysis:")
         print(f"  False Positives (Ham marked as Spam): {fp}")
         print(f"  False Negatives (Spam marked as Ham): {fn}")
         print(f"  False Positive Rate: {fp/(fp+tn):.4f}")
@@ -331,12 +331,12 @@ class EmailPhishingPipeline:
         # Load LSA encoder
         lsa_path = model_dir / 'lsa_encoder.pkl'
         self.lsa_encoder = joblib.load(lsa_path)
-        print(f"✓ LSA encoder loaded")
+        print("✓ LSA encoder loaded")
 
         # Load classifier
         clf_path = model_dir / 'phishing_classifier.pkl'
         self.classifier = joblib.load(clf_path)
-        print(f"✓ Classifier loaded")
+        print("✓ Classifier loaded")
 
         # Load metadata
         metadata_path = model_dir / 'pipeline_metadata.pkl'
@@ -344,9 +344,9 @@ class EmailPhishingPipeline:
         self.feature_dim = metadata['feature_dim']
         self.lsa_min_df = metadata['lsa_min_df']
         self.lsa_max_df = metadata['lsa_max_df']
-        print(f"✓ Metadata loaded")
+        print("✓ Metadata loaded")
 
-        print(f"Models loaded successfully!")
+        print("Models loaded successfully!")
 
     def predict_single(self, email: str) -> Tuple[int, float]:
         """
@@ -428,7 +428,7 @@ def train_pipeline(args):
     pipeline.train_classifier(X_train, y_train)
 
     # Evaluate
-    metrics = pipeline.evaluate(X_test, y_test)
+    pipeline.evaluate(X_test, y_test)
 
     # Save models
     output_dir = base_dir / 'models'
@@ -438,7 +438,7 @@ def train_pipeline(args):
     print("Pipeline Training Complete!")
     print(f"{'='*60}")
     print(f"Models saved to: {output_dir}")
-    print(f"To use for prediction: python pipeline.py --predict <email_file>")
+    print("To use for prediction: python pipeline.py --predict <email_file>")
 
 
 def predict_email(args):
@@ -472,13 +472,13 @@ def predict_email(args):
 
     if prediction == 1:
         if probability > 0.9:
-            print(f"Risk Level: HIGH (Very likely spam)")
+            print("Risk Level: HIGH (Very likely spam)")
         elif probability > 0.7:
-            print(f"Risk Level: MEDIUM (Likely spam)")
+            print("Risk Level: MEDIUM (Likely spam)")
         else:
-            print(f"Risk Level: LOW (Possibly spam)")
+            print("Risk Level: LOW (Possibly spam)")
     else:
-        print(f"Risk Level: Safe (Legitimate email)")
+        print("Risk Level: Safe (Legitimate email)")
 
 
 def main():

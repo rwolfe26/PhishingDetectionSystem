@@ -6,14 +6,15 @@ This guide covers training, prediction, benchmarking, and tuning for the phishin
 
 The pipeline integrates three layers:
 
-1. **Email Preprocessing** (44 numeric features)
+1. **Email Preprocessing** (47 numeric features)
    - URL analysis (IP addresses, HTTPS, suspicious ports, shorteners, homographs, brand Levenshtein)
-   - Text analysis (word counts, character stats, urgency density)
+   - Text analysis (word counts, character stats, special-char ratio, unique-word ratio, caps ratio)
    - Keyword analysis (urgency, credential, action, and auth keywords)
    - Header analysis (Reply-To / Return-Path / SPF / DKIM mismatches, received hops)
    - HTML analysis (forms, iframes, hidden text, external links)
-   - Attachment analysis (executables, archives)
+   - Attachment analysis (executables, archives, double-extension detection)
    - Phishing-specific signals (brand impersonation, sender display-name spoofing, generic greeting, all-caps subject)
+   - URL redirect resolution (follows shorteners to final destination domain)
 
 2. **LSA Semantic Analysis** (configurable dimensions, default 128)
    - TF-IDF vectorisation with n-grams
@@ -21,7 +22,7 @@ The pipeline integrates three layers:
    - L2 normalisation for stability
 
 3. **Random Forest Classifier**
-   - Trained on combined feature vectors (44 numeric + N LSA dims)
+   - Trained on combined feature vectors (47 numeric + 128 LSA = 175 total features)
    - Provides probability scores for risk assessment
    - `class_weight='balanced'` handles class imbalance automatically
 
@@ -74,7 +75,8 @@ python run_pipeline.py --train \
   --csv-samples 3000 \        # Max phishing/safe samples from CSV (default: 5000)
   --cross-validate \          # Run stratified 5-fold CV before final training
   --cv-folds 5 \              # Number of CV folds (default: 5)
-  --error-analysis            # Save misclassified emails to error_analysis.txt
+  --error-analysis \          # Save misclassified emails to error_analysis.txt
+  --include-feedback          # Merge user feedback corrections into training data
 ```
 
 ### 2. Predict a Single Email
@@ -135,6 +137,11 @@ API endpoints:
 - `GET /health` — model status check
 - `POST /classify` — classify raw email text (JSON)
 - `POST /classify/file` — classify an uploaded `.eml` / `.txt` file
+- `GET /dashboard` — monitoring dashboard UI
+- `GET /api/monitor/stats` — aggregate classification statistics
+- `GET /api/monitor/history` — recent classification history (from IMAP monitor)
+- `POST /api/feedback` — submit a correction or confirmation for a classification
+- `GET /api/feedback/stats` — feedback totals and pending correction count
 
 ## Architecture
 
@@ -143,7 +150,12 @@ API endpoints:
 ```
 Detection_System/
 ├── run_pipeline.py               # Main CLI entry point
+├── monitor.py                    # IMAP monitor CLI entry point
+├── download_models.py            # Downloads models from HF Hub at startup
 ├── requirements.txt              # Python dependencies
+├── Dockerfile                    # Production container
+├── render.yaml                   # Render.com deployment config
+├── DEPLOY.md                     # Deployment guide (HF Hub + Render/HF Spaces)
 │
 ├── pipeline/                     # Modular pipeline package
 │   ├── __init__.py
@@ -153,18 +165,28 @@ Detection_System/
 │   └── predictor.py              # Predictor (single email inference)
 │
 ├── preprocessing/                # Email preprocessing
-│   ├── __init__.py               # Public API + fit_lsa_encoder, fit_and_extract_features
+│   ├── __init__.py
 │   ├── email_parser.py           # RFC 822 / MIME parsing
-│   ├── url_extractor.py          # URL extraction and analysis
-│   └── feature_extractor.py     # 42 numeric features
+│   ├── url_extractor.py          # URL extraction + redirect resolution
+│   └── feature_extractor.py     # 47 numeric features
 │
 ├── bert_base/                    # LSA semantic analysis
 │   └── lsa_tool.py               # LSATextEncoder (TF-IDF + SVD + L2)
 │
 ├── api/                          # FastAPI web application
-│   ├── main.py                   # FastAPI app with /classify endpoints
+│   ├── main.py                   # REST API + dashboard + feedback + monitor endpoints
 │   ├── explainer.py              # Feature importance + SHAP + indicator highlighting
-│   └── static/index.html         # Single-page web frontend
+│   └── static/
+│       ├── index.html            # Classifier SPA (dark mode)
+│       └── dashboard.html        # Live monitoring dashboard
+│
+├── email_monitor/                # IMAP monitoring system
+│   ├── __init__.py
+│   ├── imap_client.py            # IMAP connection + unseen email fetcher
+│   ├── monitor.py                # Classification loop + terminal alerting
+│   ├── storage.py                # SQLite classification history store
+│   ├── feedback.py               # User correction store (active learning)
+│   └── notifier.py               # Colour-coded terminal output
 │
 ├── experiments/
 │   └── lsa_dimension_search.py   # LSA component count experiment
@@ -182,17 +204,20 @@ Detection_System/
 │   └── phishing and benign email dataset.jsonl
 │
 ├── tests/
-│   ├── test_preprocessing.py     # Preprocessing unit tests
-│   └── test_pipeline.py          # Full pipeline integration tests (29 tests)
+│   ├── test_pipeline.py          # Pipeline + preprocessing + explainer tests
+│   ├── test_preprocessing.py     # Email parser + URL extractor tests
+│   ├── test_api.py               # FastAPI endpoint tests incl. dashboard & feedback
+│   ├── test_monitor.py           # IMAP monitor + storage + notifier tests
+│   └── test_feedback.py          # FeedbackStore + /api/feedback endpoint tests
 │
 └── docs/                         # Documentation
 ```
 
-### Feature List (44 numeric features)
+### Feature List (47 numeric features)
 
 **URL features (10):** `num_urls`, `num_unique_domains`, `has_ip_url`, `no_https_ratio`, `avg_url_length`, `max_url_length`, `avg_path_depth`, `total_dots_in_urls`, `has_at_symbol_url`, `has_suspicious_port`
 
-**Text features (4):** `num_words`, `num_unique_words`, `num_chars`, `num_special_chars`
+**Text features (7):** `num_words`, `num_unique_words`, `num_chars`, `num_special_chars`, `special_char_ratio`, `unique_word_ratio`, `caps_ratio`
 
 **Keyword features (3):** `num_urgent_keywords`, `num_credential_keywords`, `num_action_keywords`
 
@@ -205,6 +230,8 @@ Detection_System/
 **Phishing-specific signals (10):** `spf_dkim_fail`, `sender_domain_mismatch`, `num_homograph_chars`, `brand_impersonation_score`, `urgency_density`, `html_text_ratio`, `num_shortener_urls`, `greeting_generic`, `num_auth_keywords`, `subject_all_caps_ratio`
 
 **URL redirect resolution (2):** `has_redirect_url`, `num_redirect_hops`
+
+> The three ratio features (`special_char_ratio`, `unique_word_ratio`, `caps_ratio`) are length-independent, making them more discriminative than their raw-count equivalents across emails of varying length.
 
 ## Using the Pipeline Programmatically
 
@@ -245,7 +272,7 @@ Every `/classify` API response includes:
 python -m pytest tests/ -v
 ```
 
-All 36 tests should pass.
+All 60+ tests should pass.
 
 ## Troubleshooting
 

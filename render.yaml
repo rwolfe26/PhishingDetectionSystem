@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: phishing-detector
+    runtime: docker
+    plan: free          # upgrade to "starter" ($7/mo) for always-on
+    healthCheckPath: /health
+    envVars:
+      - key: HF_REPO_ID
+        value: your-hf-username/phishing-detector   # ← change this
+      - key: MODEL_DIR
+        value: /app/models
+      - key: CORS_ORIGINS
+        value: "*"
+      # HF_TOKEN is only needed for private repos — leave blank for public
+      # - key: HF_TOKEN
+      #   sync: false   # set manually in Render dashboard (never commit tokens)

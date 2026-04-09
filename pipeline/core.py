@@ -5,16 +5,13 @@ Main EmailPhishingPipeline class that orchestrates the complete workflow.
 """
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 import numpy as np
 import joblib
 
 from preprocessing import (
     fit_lsa_encoder,
     fit_lsa_encoder_from_texts,
-    fit_and_extract_features,
-    preprocess_email_batch_with_lsa,
-    preprocess_email_with_lsa,
 )
 
 
@@ -81,7 +78,6 @@ class EmailPhishingPipeline:
         Returns:
             Feature matrix of shape (n_emails, n_numeric + n_lsa)
         """
-        from preprocessing import preprocess_email, fit_lsa_encoder_from_texts
 
         print(f"\n{'='*60}")
         print("Single-Pass: Preprocessing + LSA Fit + Feature Extraction")
@@ -218,12 +214,12 @@ class EmailPhishingPipeline:
         # Load LSA encoder
         lsa_path = model_dir / 'lsa_encoder.pkl'
         self.lsa_encoder = joblib.load(lsa_path)
-        print(f"✓ LSA encoder loaded")
+        print("✓ LSA encoder loaded")
 
         # Load classifier
         clf_path = model_dir / 'phishing_classifier.pkl'
         self.classifier = joblib.load(clf_path)
-        print(f"✓ Classifier loaded")
+        print("✓ Classifier loaded")
 
         # Load metadata
         metadata_path = model_dir / 'pipeline_metadata.pkl'
@@ -231,6 +227,6 @@ class EmailPhishingPipeline:
         self.feature_dim = metadata['feature_dim']
         self.lsa_min_df = metadata['lsa_min_df']
         self.lsa_max_df = metadata['lsa_max_df']
-        print(f"✓ Metadata loaded")
+        print("✓ Metadata loaded")
 
-        print(f"Models loaded successfully!")
+        print("Models loaded successfully!")

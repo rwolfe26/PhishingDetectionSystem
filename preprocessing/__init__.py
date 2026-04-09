@@ -22,7 +22,6 @@ Usage:
 """
 
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
-from dataclasses import asdict
 import numpy as np
 
 from .email_parser import (
@@ -82,12 +81,12 @@ __all__ = [
 def preprocess_email(raw_email: str) -> Dict[str, Any]:
     """
     Complete email preprocessing pipeline.
-    
+
     Chains: raw text → parse → URL extraction → feature extraction
-    
+
     Args:
         raw_email: Raw email text (RFC 822 / mbox format)
-        
+
     Returns:
         Dictionary containing:
         - parsed: ParsedEmail object
@@ -106,7 +105,7 @@ def preprocess_email(raw_email: str) -> Dict[str, Any]:
     # Step 1: Parse email
     parser = EmailParser()
     parsed = parser.parse(raw_email)
-    
+
     # Step 2: Extract URLs
     url_extractor = URLExtractor()
     urls = url_extractor.extract_all(
@@ -114,11 +113,11 @@ def preprocess_email(raw_email: str) -> Dict[str, Any]:
         html=parsed.body_html
     )
     unique_domains = get_unique_domains(urls)
-    
+
     # Step 3: Extract features
     feature_extractor = FeatureExtractor()
     features = feature_extractor.extract(parsed, urls)
-    
+
     # Build result dictionary
     return {
         # Parsed components
@@ -128,14 +127,14 @@ def preprocess_email(raw_email: str) -> Dict[str, Any]:
         'body_html': parsed.body_html,
         'headers': parsed.headers,
         'from_address': parsed.from_address,
-        
+
         # URLs
         'urls': urls,
         'unique_domains': unique_domains,
-        
+
         # Attachments
         'attachments': parsed.attachments,
-        
+
         # Features for ML
         'features': features,
         'feature_dict': features.to_dict(),
@@ -147,10 +146,10 @@ def preprocess_email(raw_email: str) -> Dict[str, Any]:
 def preprocess_email_batch(raw_emails: List[str]) -> List[Dict[str, Any]]:
     """
     Process multiple emails.
-    
+
     Args:
         raw_emails: List of raw email texts
-        
+
     Returns:
         List of preprocessing results
     """

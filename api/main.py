@@ -21,7 +21,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -269,7 +268,7 @@ async def classify_email(request: ClassifyRequest):
 
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception:
         logger.exception('classification error')
         raise HTTPException(status_code=500, detail="Internal classification error")
 

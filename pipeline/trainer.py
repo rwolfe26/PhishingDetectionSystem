@@ -6,10 +6,10 @@ classifier benchmarking, and error analysis.
 """
 
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
-from sklearn.linear_model import LogisticRegression, SGDClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import (
@@ -22,7 +22,6 @@ from sklearn.metrics import (
 from sklearn.model_selection import (
     StratifiedKFold,
     RandomizedSearchCV,
-    cross_val_predict,
 )
 
 
@@ -150,20 +149,20 @@ class Trainer:
         print(f"F1-Score:  {f1:.4f}")
         print(f"AUC-ROC:   {auc:.4f}")
 
-        print(f"\nConfusion Matrix:")
-        print(f"                 Predicted")
-        print(f"                Ham    Spam")
+        print("\nConfusion Matrix:")
+        print("                 Predicted")
+        print("                Ham    Spam")
         print(f"Actual  Ham    {tn:5d}  {fp:5d}")
         print(f"        Spam   {fn:5d}  {tp:5d}")
 
         fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
         fnr = fn / (fn + tp) if (fn + tp) > 0 else 0
 
-        print(f"\nError Rates:")
+        print("\nError Rates:")
         print(f"  False Positive Rate: {fpr:.4f}  ({fp} ham emails flagged as spam)")
         print(f"  False Negative Rate: {fnr:.4f}  ({fn} spam emails missed)")
 
-        print(f"\nDetailed Classification Report:")
+        print("\nDetailed Classification Report:")
         print(classification_report(y_test, y_pred, target_names=['Ham', 'Spam/Phishing']))
 
         return {
@@ -221,7 +220,7 @@ class Trainer:
             print(f"  Fold {fold}: Acc={acc:.4f}  Prec={prec:.4f}  Rec={rec:.4f}  "
                   f"F1={f1:.4f}  AUC={auc:.4f}")
 
-        print(f"\n  Mean ± Std:")
+        print("\n  Mean ± Std:")
         for metric in ('acc', 'prec', 'rec', 'f1', 'auc'):
             vals = [m[metric] for m in fold_metrics]
             print(f"  {metric.upper():5s}: {np.mean(vals):.4f} ± {np.std(vals):.4f}")

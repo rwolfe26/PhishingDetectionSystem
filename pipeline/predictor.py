@@ -57,10 +57,10 @@ class Predictor:
 
         if prediction == 1:
             if probability > 0.9:
-                print(f"Risk Level: HIGH (Very likely spam)")
+                print("Risk Level: HIGH (Very likely spam)")
             elif probability > 0.7:
-                print(f"Risk Level: MEDIUM (Likely spam)")
+                print("Risk Level: MEDIUM (Likely spam)")
             else:
-                print(f"Risk Level: LOW (Possibly spam)")
+                print("Risk Level: LOW (Possibly spam)")
         else:
-            print(f"Risk Level: Safe (Legitimate email)")
+            print("Risk Level: Safe (Legitimate email)")

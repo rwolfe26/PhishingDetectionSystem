@@ -99,7 +99,6 @@ def main():
 
     # Optional cap for speed
     if args.max_emails:
-        from sklearn.utils import resample
         ham_idx = [i for i, l in enumerate(labels) if l == 0][:args.max_emails]
         spam_idx = [i for i, l in enumerate(labels) if l == 1][:args.max_emails]
         keep = ham_idx + spam_idx

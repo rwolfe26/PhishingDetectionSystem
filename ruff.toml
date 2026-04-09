@@ -1,0 +1,11 @@
+[lint]
+select = ["E", "F", "W"]
+ignore = ["E501", "E741"]  # E501: line too long; E741: ambiguous variable names
+
+exclude = [
+    "old_models/",        # historical backup, not active code
+    ".venv/",
+    "__pycache__/",
+    "Datasets/",
+    "spamassassin_data/",
+]

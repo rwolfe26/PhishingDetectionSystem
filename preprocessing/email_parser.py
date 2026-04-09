@@ -11,11 +11,10 @@ Parses raw email text (RFC 822 / mbox format) into structured components:
 
 import email
 from email import policy
-from email.parser import Parser, BytesParser
+from email.parser import Parser
 from email.message import EmailMessage
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
-import re
 
 
 @dataclass
@@ -34,7 +33,7 @@ class ParsedEmail:
     subject: str = ""
     body_text: str = ""
     body_html: str = ""
-    
+
     # Headers
     headers: Dict[str, Any] = field(default_factory=dict)
     from_address: str = ""
@@ -44,15 +43,15 @@ class ParsedEmail:
     return_path: str = ""
     date: str = ""
     message_id: str = ""
-    
+
     # Technical headers
     received_chain: List[str] = field(default_factory=list)
     x_mailer: str = ""
     content_type: str = ""
-    
+
     # Attachments
     attachments: List[AttachmentInfo] = field(default_factory=list)
-    
+
     # Parsing metadata
     is_multipart: bool = False
     parse_errors: List[str] = field(default_factory=list)
@@ -61,36 +60,36 @@ class ParsedEmail:
 class EmailParser:
     """
     Parser for raw email text into structured components.
-    
+
     Handles:
     - Plain text emails (RFC 822)
     - MIME multipart emails
     - Various encodings
     - Malformed headers
     """
-    
+
     def __init__(self):
         self._parser = Parser(policy=policy.default)
-    
+
     def parse(self, raw_email: str) -> ParsedEmail:
         """
         Parse raw email text into structured components.
-        
+
         Args:
             raw_email: Raw email text (headers + body)
-            
+
         Returns:
             ParsedEmail object with extracted components
         """
         result = ParsedEmail()
-        
+
         try:
             # Handle mbox "From " line if present
             raw_email = self._strip_mbox_header(raw_email)
-            
+
             # Parse email
             msg = self._parser.parsestr(raw_email)
-            
+
             # Extract headers
             result.headers = self._extract_headers(msg)
             result.subject = self._decode_header(msg.get('Subject', ''))
@@ -104,28 +103,28 @@ class EmailParser:
             result.x_mailer = msg.get('X-Mailer', '') or msg.get('User-Agent', '')
             result.content_type = msg.get_content_type()
             result.is_multipart = msg.is_multipart()
-            
+
             # Extract Received chain for hop analysis
             result.received_chain = msg.get_all('Received', [])
-            
+
             # Extract body and attachments
             self._extract_body_and_attachments(msg, result)
-            
+
         except Exception as e:
             result.parse_errors.append(f"Parse error: {str(e)}")
             # Fallback: treat entire content as body
             result.body_text = raw_email
-            
+
         return result
-    
+
     def parse_bytes(self, raw_bytes: bytes, encoding: str = 'utf-8') -> ParsedEmail:
         """
         Parse raw email bytes into structured components.
-        
+
         Args:
             raw_bytes: Raw email bytes
             encoding: Fallback encoding if not specified in email
-            
+
         Returns:
             ParsedEmail object with extracted components
         """
@@ -133,16 +132,16 @@ class EmailParser:
             raw_email = raw_bytes.decode(encoding, errors='replace')
         except Exception:
             raw_email = raw_bytes.decode('latin-1', errors='replace')
-        
+
         return self.parse(raw_email)
-    
+
     def _strip_mbox_header(self, raw_email: str) -> str:
         """Remove mbox 'From ' line if present."""
         lines = raw_email.split('\n', 1)
         if lines and lines[0].startswith('From '):
             return lines[1] if len(lines) > 1 else ''
         return raw_email
-    
+
     def _extract_headers(self, msg: EmailMessage) -> Dict[str, Any]:
         """Extract all headers as a dictionary."""
         headers = {}
@@ -153,15 +152,15 @@ class EmailParser:
             else:
                 headers[key] = [self._decode_header(v) for v in values]
         return headers
-    
+
     def _decode_header(self, header_value: Any) -> str:
         """Decode header value, handling encoded words."""
         if header_value is None:
             return ""
-        
+
         if isinstance(header_value, str):
             return header_value
-        
+
         try:
             # Handle email.header.Header objects
             decoded_parts = email.header.decode_header(str(header_value))
@@ -175,18 +174,18 @@ class EmailParser:
             return ' '.join(result)
         except Exception:
             return str(header_value)
-    
+
     def _parse_address_list(self, address_str: str) -> List[str]:
         """Parse comma-separated address list."""
         if not address_str:
             return []
-        
+
         decoded = self._decode_header(address_str)
         # Split on comma, but be careful of quoted strings
         addresses = []
         current = []
         in_quotes = False
-        
+
         for char in decoded:
             if char == '"':
                 in_quotes = not in_quotes
@@ -197,22 +196,22 @@ class EmailParser:
                 current = []
                 continue
             current.append(char)
-        
+
         # Don't forget the last address
         addr = ''.join(current).strip()
         if addr:
             addresses.append(addr)
-        
+
         return addresses
-    
+
     def _extract_body_and_attachments(self, msg: EmailMessage, result: ParsedEmail):
         """Extract body text, HTML, and attachment metadata."""
-        
+
         if msg.is_multipart():
             for part in msg.walk():
                 content_type = part.get_content_type()
                 content_disposition = part.get_content_disposition()
-                
+
                 # Check for attachments
                 if content_disposition == 'attachment':
                     self._add_attachment(part, result)
@@ -227,19 +226,19 @@ class EmailParser:
             # Single part message
             content_type = msg.get_content_type()
             payload = self._get_payload_text(msg)
-            
+
             if content_type == 'text/html':
                 result.body_html = payload
             else:
                 result.body_text = payload
-    
+
     def _get_payload_text(self, part: EmailMessage) -> str:
         """Extract text payload from message part."""
         try:
             payload = part.get_payload(decode=True)
             if payload is None:
                 return str(part.get_payload()) if part.get_payload() else ""
-            
+
             # Try to decode with charset
             charset = part.get_content_charset() or 'utf-8'
             try:
@@ -248,7 +247,7 @@ class EmailParser:
                 return payload.decode('utf-8', errors='replace')
         except Exception:
             return ""
-    
+
     def _add_attachment(self, part: EmailMessage, result: ParsedEmail):
         """Add attachment metadata to result."""
         try:
@@ -256,7 +255,7 @@ class EmailParser:
             size = len(payload) if payload else 0
         except Exception:
             size = 0
-        
+
         attachment = AttachmentInfo(
             filename=part.get_filename(),
             content_type=part.get_content_type(),

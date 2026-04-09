@@ -442,6 +442,14 @@
     <div class="section-title">Detected Phishing Indicators</div>
     <div id="indicators-panel"></div>
 
+    <!-- Copy result -->
+    <div id="copy-row" style="display:none;margin-top:16px;">
+      <button onclick="copyResult()" id="copy-btn" class="btn btn-ghost" style="padding:6px 14px;font-size:0.8rem;display:flex;align-items:center;gap:6px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+        Copy result
+      </button>
+    </div>
+
     <!-- Feedback widget -->
     <div id="feedback-widget" style="display:none;margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
       <div id="feedback-prompt" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -755,6 +763,7 @@ sarah.johnson@acmecorp.com | (555) 123-4567`
     // Pre-select the opposite label as the default correction
     const opposite = prediction === 'phishing' ? 'benign' : 'phishing';
     document.getElementById('fb-correct-label').value = opposite;
+    document.getElementById('copy-row').style.display = 'block';
     document.getElementById('feedback-widget').style.display = 'block';
     document.getElementById('feedback-prompt').style.display = 'flex';
     document.getElementById('feedback-correction').style.display = 'none';
@@ -793,6 +802,21 @@ sarah.johnson@acmecorp.com | (555) 123-4567`
     document.getElementById('feedback-prompt').style.display    = 'none';
     document.getElementById('feedback-correction').style.display = 'none';
     document.getElementById('feedback-thanks').style.display    = 'block';
+  }
+
+  function copyResult() {
+    const verdict = _lastPrediction === 'phishing' ? 'PHISHING' : 'SAFE';
+    const pct = (_lastConfidence * 100).toFixed(1);
+    const text = `PhishingDetector verdict: ${verdict} (${pct}% confidence)\nhttps://rwolfe26-phishing-detector.hf.space`;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copy-btn');
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => {
+        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> Copy result';
+      }, 2000);
+    }).catch(() => {
+      prompt('Copy this result:', text);
+    });
   }
 </script>
 </body>

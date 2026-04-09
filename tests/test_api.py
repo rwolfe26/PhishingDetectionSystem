@@ -264,5 +264,64 @@ class TestSinglePassExtraction:
         assert set(preds).issubset({0, 1})
 
 
+# ── /dashboard and /api/monitor/* ────────────────────────────────────────────
+
+class TestDashboardEndpoints:
+    def test_dashboard_page_returns_html(self, client):
+        resp = client.get('/dashboard')
+        assert resp.status_code == 200
+        assert 'text/html' in resp.headers['content-type']
+        assert 'Dashboard' in resp.text
+
+    def test_monitor_stats_no_db(self, client):
+        """Stats endpoint returns zeros when monitor.db doesn't exist."""
+        with patch('api.main._monitor_db') as mock_db:
+            mock_db.exists.return_value = False
+            resp = client.get('/api/monitor/stats')
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data['total'] == 0
+        assert data['db_exists'] is False
+
+    def test_monitor_history_no_db(self, client):
+        """History endpoint returns empty list when monitor.db doesn't exist."""
+        with patch('api.main._monitor_db') as mock_db:
+            mock_db.exists.return_value = False
+            resp = client.get('/api/monitor/history')
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data['items'] == []
+        assert data['db_exists'] is False
+
+    def test_monitor_stats_with_data(self, client):
+        """Stats endpoint reads from a real in-memory store."""
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from email_monitor.storage import ClassificationStore
+
+        store = ClassificationStore(':memory:')
+        store.save({'message_id': '<a@x.com>', 'prediction': 'phishing',
+                    'confidence': 0.9, 'risk_level': 'HIGH'})
+        store.save({'message_id': '<b@x.com>', 'prediction': 'benign',
+                    'confidence': 0.85, 'risk_level': 'SAFE'})
+
+        with patch('api.main._monitor_db') as mock_db, \
+             patch('email_monitor.storage.ClassificationStore', return_value=store):
+            mock_db.exists.return_value = True
+            resp = client.get('/api/monitor/stats')
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data['db_exists'] is True
+
+    def test_monitor_history_limit_param(self, client):
+        """History endpoint accepts a limit query param."""
+        with patch('api.main._monitor_db') as mock_db:
+            mock_db.exists.return_value = False
+            resp = client.get('/api/monitor/history?limit=10')
+        assert resp.status_code == 200
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

@@ -105,6 +105,10 @@ _model_dir = Path(
     os.environ.get('MODEL_DIR', str(Path(__file__).resolve().parent.parent / 'models'))
 )
 
+_monitor_db = Path(
+    os.environ.get('MONITOR_DB', str(Path(__file__).resolve().parent.parent / 'monitor.db'))
+)
+
 # ── Models / state ──────────────────────────────────────────────────────────
 
 _pipeline: Optional[EmailPhishingPipeline] = None
@@ -201,6 +205,46 @@ async def serve_frontend():
     if html_path.exists():
         return html_path.read_text(encoding='utf-8')
     return HTMLResponse("<h1>Phishing Detector API</h1><p>See <a href='/docs'>/docs</a></p>")
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def serve_dashboard():
+    """Serve the monitoring dashboard HTML page."""
+    html_path = static_dir / 'dashboard.html'
+    if html_path.exists():
+        return html_path.read_text(encoding='utf-8')
+    return HTMLResponse("<h1>Dashboard</h1><p>dashboard.html not found.</p>")
+
+
+@app.get("/api/monitor/stats")
+async def monitor_stats():
+    """Aggregate classification counts from the monitor database."""
+    if not _monitor_db.exists():
+        return {"total": 0, "phishing": 0, "benign": 0, "db_exists": False}
+    try:
+        from email_monitor.storage import ClassificationStore
+        store = ClassificationStore(str(_monitor_db))
+        stats = store.stats()
+        stats["db_exists"] = True
+        return stats
+    except Exception as exc:
+        logger.exception("monitor_stats error")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/monitor/history")
+async def monitor_history(limit: int = 50):
+    """Recent classified emails from the monitor database."""
+    if not _monitor_db.exists():
+        return {"items": [], "db_exists": False}
+    try:
+        from email_monitor.storage import ClassificationStore
+        store = ClassificationStore(str(_monitor_db))
+        items = store.recent(limit=min(limit, 200))
+        return {"items": items, "db_exists": True}
+    except Exception as exc:
+        logger.exception("monitor_history error")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.get("/health")

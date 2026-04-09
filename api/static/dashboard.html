@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monitor Dashboard — Phishing Detector</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1a1d27;
+      --surface2: #232636;
+      --border:   #2e3248;
+      --text:     #e2e4f0;
+      --muted:    #7c8098;
+      --accent:   #6366f1;
+      --danger:   #ef4444;
+      --warning:  #f59e0b;
+      --safe:     #22c55e;
+      --low:      #fb923c;
+      --radius:   12px;
+      --font:     'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 16px 64px;
+    }
+
+    /* ── Nav ────────────────────────────────────────────────────────────── */
+    nav {
+      width: 100%;
+      max-width: 960px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 20px 0 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 36px;
+    }
+    nav a {
+      padding: 7px 16px;
+      border-radius: 7px;
+      text-decoration: none;
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--muted);
+      transition: color 0.15s, background 0.15s;
+    }
+    nav a:hover { color: var(--text); background: var(--surface2); }
+    nav a.active { color: var(--text); background: var(--surface2); }
+    nav .logo {
+      margin-right: auto;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+    }
+    nav .logo span { color: var(--accent); }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    .page-header {
+      width: 100%;
+      max-width: 960px;
+      margin-bottom: 28px;
+    }
+    .page-header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+    }
+    .page-header p {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .refresh-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .refresh-btn {
+      padding: 6px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .refresh-btn:hover { background: var(--border); }
+    .refresh-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    /* ── Stat cards ──────────────────────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      width: 100%;
+      max-width: 960px;
+      margin-bottom: 28px;
+    }
+    @media (max-width: 640px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+    }
+    .stat-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .stat-value.danger  { color: var(--danger); }
+    .stat-value.safe    { color: var(--safe); }
+    .stat-value.warning { color: var(--warning); }
+    .stat-sub {
+      margin-top: 6px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    /* ── Table card ──────────────────────────────────────────────────────── */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 960px;
+      overflow: hidden;
+    }
+    .table-card-header {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .table-card-header h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .table-card-header span {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    thead th {
+      padding: 10px 16px;
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    td {
+      padding: 12px 16px;
+      vertical-align: middle;
+    }
+    .td-time   { color: var(--muted); white-space: nowrap; font-size: 0.8rem; }
+    .td-sender { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .td-subj   { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .td-conf   { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ── Risk badges ─────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+    .badge.HIGH   { background: rgba(239,68,68,.18);  color: #f87171; }
+    .badge.MEDIUM { background: rgba(245,158,11,.18); color: #fbbf24; }
+    .badge.LOW    { background: rgba(251,146,60,.18); color: #fb923c; }
+    .badge.SAFE   { background: rgba(34,197,94,.15);  color: #4ade80; }
+
+    /* ── Empty / loading states ──────────────────────────────────────────── */
+    .empty {
+      padding: 56px 24px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .empty h3 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+    .empty p  { font-size: 0.85rem; line-height: 1.6; }
+    .empty code {
+      display: inline-block;
+      margin-top: 14px;
+      padding: 10px 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.8rem;
+      color: var(--accent);
+    }
+
+    #loading { padding: 40px; text-align: center; color: var(--muted); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <a href="/" class="logo">Phishing<span>Detector</span></a>
+    <a href="/">Classifier</a>
+    <a href="/dashboard" class="active">Dashboard</a>
+  </nav>
+
+  <!-- Header -->
+  <div class="page-header">
+    <h1>Monitor Dashboard</h1>
+    <p>Live view of emails classified by the IMAP monitor.</p>
+    <div class="refresh-row">
+      <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+      <span class="refresh-label" id="refresh-label">Auto-refreshes every 30 s</span>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card"><div class="stat-label">Total scanned</div><div class="stat-value" id="s-total">—</div></div>
+    <div class="stat-card"><div class="stat-label">Phishing</div><div class="stat-value danger" id="s-phishing">—</div></div>
+    <div class="stat-card"><div class="stat-label">Benign</div><div class="stat-value safe" id="s-benign">—</div></div>
+    <div class="stat-card"><div class="stat-label">Detection rate</div><div class="stat-value warning" id="s-rate">—</div><div class="stat-sub" id="s-rate-sub"></div></div>
+  </div>
+
+  <!-- History table -->
+  <div class="table-card">
+    <div class="table-card-header">
+      <h2>Recent Classifications</h2>
+      <span id="table-count"></span>
+    </div>
+    <div id="table-body">
+      <div id="loading">Loading…</div>
+    </div>
+  </div>
+
+<script>
+  const API = window.location.origin;
+
+  async function loadStats() {
+    try {
+      const r = await fetch(`${API}/api/monitor/stats`);
+      const d = await r.json();
+      document.getElementById('s-total').textContent    = d.total ?? '—';
+      document.getElementById('s-phishing').textContent = d.phishing ?? '—';
+      document.getElementById('s-benign').textContent   = d.benign ?? '—';
+      if (d.total > 0) {
+        const rate = ((d.phishing / d.total) * 100).toFixed(1);
+        document.getElementById('s-rate').textContent     = rate + '%';
+        document.getElementById('s-rate-sub').textContent = `of ${d.total} emails`;
+      } else {
+        document.getElementById('s-rate').textContent = '—';
+      }
+    } catch (e) { console.error('stats error', e); }
+  }
+
+  async function loadHistory() {
+    try {
+      const r = await fetch(`${API}/api/monitor/history?limit=100`);
+      const d = await r.json();
+      const container = document.getElementById('table-body');
+
+      if (!d.db_exists || !d.items || d.items.length === 0) {
+        container.innerHTML = `
+          <div class="empty">
+            <h3>No data yet</h3>
+            <p>Run the IMAP monitor to start classifying your inbox.</p>
+            <code>python monitor.py --host imap.gmail.com --user you@gmail.com --password APP_PW</code>
+          </div>`;
+        document.getElementById('table-count').textContent = '';
+        return;
+      }
+
+      document.getElementById('table-count').textContent =
+        `${d.items.length} most recent`;
+
+      const rows = d.items.map(item => {
+        const time   = fmtTime(item.classified_at);
+        const sender = esc(item.sender || '—');
+        const subj   = esc(item.subject || '(no subject)');
+        const risk   = item.risk_level || 'SAFE';
+        const conf   = item.prediction === 'phishing'
+          ? (item.confidence * 100).toFixed(0) + '%'
+          : ((1 - item.confidence) * 100).toFixed(0) + '%';
+        const confClass = item.prediction === 'phishing' ? 'danger' : 'safe';
+        return `<tr>
+          <td class="td-time">${time}</td>
+          <td class="td-sender" title="${sender}">${sender}</td>
+          <td class="td-subj"  title="${subj}">${subj}</td>
+          <td><span class="badge ${risk}">${risk}</span></td>
+          <td class="td-conf" style="color:var(--${confClass})">${conf}</td>
+        </tr>`;
+      }).join('');
+
+      container.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>From</th>
+              <th>Subject</th>
+              <th>Risk</th>
+              <th style="text-align:right">Confidence</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    } catch (e) {
+      console.error('history error', e);
+      document.getElementById('table-body').innerHTML =
+        '<div class="empty"><h3>Failed to load history</h3><p>' + e.message + '</p></div>';
+    }
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      const now = new Date();
+      const diffMin = Math.floor((now - d) / 60000);
+      if (diffMin < 1)  return 'just now';
+      if (diffMin < 60) return `${diffMin}m ago`;
+      if (diffMin < 1440) return `${Math.floor(diffMin / 60)}h ago`;
+      return d.toLocaleDateString();
+    } catch { return iso; }
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  async function loadAll() {
+    await Promise.all([loadStats(), loadHistory()]);
+    const label = document.getElementById('refresh-label');
+    const ts = new Date().toLocaleTimeString();
+    label.textContent = `Last updated ${ts}  •  Auto-refreshes every 30 s`;
+  }
+
+  // Initial load + 30-second auto-refresh
+  loadAll();
+  setInterval(loadAll, 30_000);
+</script>
+</body>
+</html>

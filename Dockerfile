@@ -16,10 +16,12 @@ COPY . .
 
 ENV MODEL_DIR=/app/models
 ENV CORS_ORIGINS=*
-# HF_REPO_ID and HF_TOKEN are injected by Render (or docker run -e)
+# HF_REPO_ID and HF_TOKEN are injected by Render / HF Spaces (or docker run -e)
+# PORT is set by the host: HF Spaces uses 7860, Render uses its own value.
+ENV PORT=8000
 
-EXPOSE 8000
+EXPOSE 7860
 
 # Download models from HF Hub (no-op if already present or HF_REPO_ID unset),
-# then start the API server.
-CMD ["sh", "-c", "python download_models.py && uvicorn api.main:app --host 0.0.0.0 --port 8000"]
+# then start the API server on whichever PORT the host provides.
+CMD ["sh", "-c", "python download_models.py && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

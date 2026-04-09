@@ -1,3 +1,13 @@
+---
+title: Phishing Detector
+emoji: 🎣
+colorFrom: red
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Email Phishing Detection System
 
 A machine learning pipeline for detecting phishing emails using handcrafted feature engineering and LSA semantic analysis.

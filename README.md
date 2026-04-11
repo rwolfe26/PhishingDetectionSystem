@@ -20,6 +20,7 @@ A production-ready machine learning system that classifies emails as phishing or
 Paste any email (or upload a `.txt` / `.eml` file) and the system:
 
 - Classifies it as **phishing** or **safe** with a confidence score
+- Gives a **plain-English summary** of why — written for non-technical users, not data scientists
 - Explains *why* using the top contributing features and SHAP values
 - Highlights the specific words and phrases that triggered the detection
 - Assigns a risk level: `HIGH / MEDIUM / LOW / SAFE`
@@ -70,6 +71,7 @@ These 47 numeric features are combined with **128-dimensional LSA semantic embed
 
 ### Explainability
 
+- **Plain-English summary** — rule-based narrative explanation generated from all 44 numeric signals; written for non-technical users (e.g. "The sender's display name doesn't match their actual email address, a classic impersonation tactic")
 - **Feature importance** — ranked contribution of each of the 175 features
 - **SHAP values** — per-prediction Shapley explanations
 - **Indicator highlighting** — the exact words/phrases flagged in the email text
@@ -79,7 +81,7 @@ These 47 numeric features are combined with **128-dimensional LSA semantic embed
 | Component | Technology |
 |-----------|-----------|
 | REST API | FastAPI + Uvicorn, structured JSON logging, request-ID middleware |
-| Frontend | Vanilla JS single-page app, dark mode, file upload |
+| Frontend | Vanilla JS SPA — split-panel layout, Barlow Condensed + JetBrains Mono typography, plain-English result summaries |
 | IMAP Monitor | Polls a live mailbox, classifies incoming emails, stores results in SQLite |
 | Dashboard | Live monitoring view — classification history, stats, detection rate |
 | Feedback loop | Users correct wrong predictions; corrections feed back into retraining |

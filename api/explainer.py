@@ -171,6 +171,194 @@ def explain_with_shap(pipeline, feature_vector: np.ndarray,
         return None
 
 
+def generate_plain_english_summary(
+    prediction: str,
+    confidence: float,
+    risk_level: str,
+    top_features: list,
+    indicators: dict,
+    feature_vector=None,
+) -> str:
+    """
+    Generate a plain-English explanation of the classification for non-technical users.
+
+    Reads from the full feature vector (all 44 numeric features) when available so it
+    can reference any signal, not just the top-8 returned to the UI.
+    """
+    # Build a name→value map from the full feature vector, falling back to top_features
+    fv: dict = {}
+    if feature_vector is not None:
+        for i, name in enumerate(NUMERIC_NAMES):
+            if i < len(feature_vector):
+                fv[name] = float(feature_vector[i])
+    for f in top_features:
+        fv.setdefault(f['name'], f['value'])
+
+    def fval(name: str) -> float:
+        return fv.get(name, 0.0)
+
+    urgent_phrases     = indicators.get('urgent_phrases', [])
+    credential_phrases = indicators.get('credential_phrases', [])
+    suspicious_urls    = indicators.get('suspicious_urls', [])
+
+    # ── Phishing branch ───────────────────────────────────────────────────────
+    if prediction == 'phishing':
+        pct = int(round(confidence * 100))
+        if risk_level == 'HIGH':
+            opener = f"This email is very likely a phishing attempt ({pct}% confidence)."
+        elif risk_level == 'MEDIUM':
+            opener = f"This email shows multiple signs of phishing ({pct}% confidence)."
+        else:
+            opener = (
+                f"This email has some suspicious characteristics, "
+                f"though the signal is weaker ({pct}% confidence)."
+            )
+
+        reasons = []
+
+        if urgent_phrases:
+            sample = ', '.join(f'"{p}"' for p in urgent_phrases[:2])
+            tail   = f" and {len(urgent_phrases) - 2} more" if len(urgent_phrases) > 2 else ""
+            reasons.append(
+                f"it uses urgency phrases like {sample}{tail} "
+                f"designed to make you act without thinking"
+            )
+
+        if credential_phrases:
+            reasons.append(
+                "it asks you to submit sensitive information "
+                "such as passwords or account credentials"
+            )
+
+        if fval('sender_domain_mismatch') > 0:
+            reasons.append(
+                "the sender's display name doesn't match their actual email address, "
+                "a classic impersonation tactic"
+            )
+        elif fval('has_reply_to_mismatch') > 0:
+            reasons.append(
+                "the Reply-To address differs from the sender's address, "
+                "used to redirect your replies to the attacker"
+            )
+
+        if fval('brand_impersonation_score') > 0.3:
+            reasons.append(
+                "the wording and structure closely imitate a well-known brand or organisation"
+            )
+
+        url_shortener_count = int(fval('num_shortener_urls'))
+        if suspicious_urls or url_shortener_count > 0:
+            n         = max(len(suspicious_urls), url_shortener_count)
+            link_word = "a link" if n == 1 else f"{n} links"
+            reasons.append(f"{link_word} use URL shorteners that conceal the real destination")
+
+        if fval('has_ip_url') > 0:
+            reasons.append(
+                "at least one link uses a raw IP address instead of a normal domain, "
+                "which legitimate services never do"
+            )
+
+        if fval('has_redirect_url') > 0:
+            reasons.append(
+                "at least one link redirects through multiple websites before reaching "
+                "its final destination, a technique used to evade detection"
+            )
+
+        if fval('spf_dkim_fail') > 0:
+            reasons.append(
+                "the email failed standard authentication checks (SPF/DKIM), "
+                "indicating it may not genuinely come from the claimed sender"
+            )
+
+        if fval('greeting_generic') > 0:
+            reasons.append(
+                'it uses a generic greeting like "Dear Customer" instead of your name, '
+                "typical of mass phishing campaigns"
+            )
+
+        if fval('has_executable_attachment') > 0:
+            reasons.append(
+                "it contains an executable file attachment, "
+                "which legitimate services almost never send via email"
+            )
+
+        if fval('subject_all_caps_ratio') > 0.5:
+            reasons.append(
+                "the subject line is heavily capitalised to manufacture a false sense of urgency"
+            )
+
+        if not reasons:
+            return (
+                f"{opener} The model's analysis of language patterns, structure, and "
+                "technical signals in this email strongly suggest phishing intent, "
+                "even without obvious keyword red flags."
+            )
+
+        if len(reasons) == 1:
+            body = f"The key red flag is that {reasons[0]}."
+        elif len(reasons) == 2:
+            body = f"The main red flags are that {reasons[0]}, and {reasons[1]}."
+        else:
+            joined = '; '.join(reasons[:-1]) + f'; and {reasons[-1]}'
+            body   = f"The main red flags are: {joined}."
+
+        return f"{opener} {body}"
+
+    # ── Benign branch ─────────────────────────────────────────────────────────
+    else:
+        pct = int(round((1 - confidence) * 100))
+        if risk_level == 'SAFE':
+            opener = f"This email appears to be legitimate ({pct}% confidence)."
+        else:
+            opener = (
+                f"This email is likely legitimate, though there is some uncertainty "
+                f"({pct}% confidence)."
+            )
+
+        clean = []
+        if not urgent_phrases:
+            clean.append("no urgency tactics")
+        if not credential_phrases:
+            clean.append("no requests for passwords or sensitive data")
+        if not suspicious_urls and fval('num_shortener_urls') == 0:
+            clean.append("no suspicious links")
+        if fval('sender_domain_mismatch') == 0 and fval('has_reply_to_mismatch') == 0:
+            clean.append("no signs of sender impersonation")
+        if fval('spf_dkim_fail') == 0:
+            clean.append("it passes standard email authentication checks")
+
+        if clean:
+            if len(clean) == 1:
+                body = f"Our analysis found {clean[0]}."
+            else:
+                body = "Our analysis found " + ', '.join(clean[:-1]) + f", and {clean[-1]}."
+        else:
+            body = "Our analysis did not detect any significant phishing patterns."
+
+        caveats = []
+        if urgent_phrases:
+            sample = ', '.join(f'"{p}"' for p in urgent_phrases[:1])
+            caveats.append(
+                f"it does contain some urgent-sounding language ({sample}), "
+                "which can also appear in legitimate emails"
+            )
+        if fval('num_shortener_urls') > 0:
+            caveats.append(
+                "some shortened links are present — always hover over links to verify "
+                "the destination before clicking"
+            )
+        if fval('greeting_generic') > 0:
+            caveats.append(
+                'it uses a generic greeting, which is common in newsletters and automated emails'
+            )
+
+        if caveats:
+            caveat_str = '; '.join(caveats) + '.'
+            return f"{opener} {body} One thing to keep in mind: {caveat_str}"
+
+        return f"{opener} {body}"
+
+
 def highlight_phishing_indicators(email_text: str,
                                    feature_vector: np.ndarray) -> Dict:
     """

@@ -31,7 +31,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from pipeline import EmailPhishingPipeline
 from preprocessing import preprocess_email_with_lsa
 
-from .explainer import explain_prediction, explain_with_shap, highlight_phishing_indicators
+from .explainer import (
+    explain_prediction,
+    explain_with_shap,
+    generate_plain_english_summary,
+    highlight_phishing_indicators,
+)
 
 
 # ── Structured JSON logging ──────────────────────────────────────────────────
@@ -185,6 +190,7 @@ class ClassifyResponse(BaseModel):
     risk_level: str          # "HIGH" | "MEDIUM" | "LOW" | "SAFE"
     top_features: list       # List of FeatureExplanation dicts
     indicators: dict         # Highlighted phishing phrases
+    plain_english_summary: str  # Human-readable explanation for non-technical users
     model_loaded: bool
 
 
@@ -361,12 +367,22 @@ async def classify_email(request: ClassifyRequest):
 
         indicators = highlight_phishing_indicators(request.email_text, feature_vector)
 
+        summary = generate_plain_english_summary(
+            prediction=prediction_str,
+            confidence=confidence,
+            risk_level=risk,
+            top_features=top_features,
+            indicators=indicators,
+            feature_vector=feature_vector,
+        )
+
         return ClassifyResponse(
             prediction=prediction_str,
             confidence=round(confidence, 4),
             risk_level=risk,
             top_features=top_features,
             indicators=indicators,
+            plain_english_summary=summary,
             model_loaded=True,
         )
 

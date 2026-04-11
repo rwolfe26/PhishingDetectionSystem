@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — PhishingDetector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow:wght@400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #07070d; --surface: #0d0d1a; --border: #1c1c38;
+      --text: #dddaf2; --text-2: #7a77a0; --text-3: #3d3b58;
+      --amber: #f59e0b;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Barlow', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 20px 80px;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: radial-gradient(circle, rgba(245,158,11,.03) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none; z-index: 0;
+    }
+    nav {
+      width: 100%; max-width: 720px;
+      display: flex; align-items: center; gap: 9px;
+      padding: 20px 0 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 52px;
+      position: relative; z-index: 1;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 9px;
+      text-decoration: none; margin-right: auto;
+    }
+    .nav-logo-mark {
+      width: 26px; height: 26px; background: var(--amber);
+      border-radius: 3px; display: flex; align-items: center;
+      justify-content: center;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800; font-size: 0.72rem; color: #000;
+    }
+    .nav-logo-text {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700; font-size: 1.05rem;
+      letter-spacing: 1.5px; text-transform: uppercase; color: var(--text);
+    }
+    .nav-logo-text span { color: var(--amber); }
+    .nav-link {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 600; font-size: 0.78rem;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      color: var(--text-2); text-decoration: none;
+      transition: color .15s;
+    }
+    .nav-link:hover { color: var(--text); }
+
+    article {
+      width: 100%; max-width: 720px;
+      position: relative; z-index: 1;
+    }
+
+    .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem; color: var(--amber);
+      letter-spacing: 2.5px; text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    h1 {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800; font-size: 2.2rem;
+      letter-spacing: 0.5px; text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem; color: var(--text-3);
+      letter-spacing: 0.5px; margin-bottom: 44px;
+    }
+
+    h2 {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700; font-size: 1.1rem;
+      letter-spacing: 1px; text-transform: uppercase;
+      color: var(--text); margin: 36px 0 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    p {
+      font-size: 0.95rem; line-height: 1.8;
+      color: var(--text-2); margin-bottom: 14px;
+    }
+    ul {
+      padding-left: 20px; margin-bottom: 14px;
+    }
+    li {
+      font-size: 0.95rem; line-height: 1.8;
+      color: var(--text-2); margin-bottom: 4px;
+    }
+    strong { color: var(--text); font-weight: 600; }
+    a { color: var(--amber); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .callout {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--amber);
+      border-radius: 2px;
+      padding: 14px 18px;
+      margin: 20px 0;
+    }
+    .callout p { margin: 0; color: var(--text); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">
+    <div class="nav-logo-mark">PD</div>
+    <span class="nav-logo-text">Phishing<span>Detector</span></span>
+  </a>
+  <a href="/" class="nav-link">Classifier</a>
+  <a href="/dashboard" class="nav-link">Dashboard</a>
+</nav>
+
+<article>
+  <div class="eyebrow">// Legal</div>
+  <h1>Privacy Policy</h1>
+  <p class="meta">Applies to: PhishingDetector web app &amp; Chrome browser extension &nbsp;·&nbsp; Last updated: April 2026</p>
+
+  <div class="callout">
+    <p><strong>Short version:</strong> The PhishingDetector extension reads the email you are currently viewing, sends it to the PhishingDetector API for classification, and shows you the result. No email content is stored, logged, or shared. Nothing leaves your browser except the email you ask it to analyse.</p>
+  </div>
+
+  <h2>1. What data is accessed</h2>
+  <p>The browser extension reads the following information from the email you have open in Gmail or Outlook Web:</p>
+  <ul>
+    <li>The <strong>From</strong> address and display name</li>
+    <li>The <strong>Subject</strong> line</li>
+    <li>The <strong>body text</strong> of the email</li>
+  </ul>
+  <p>The extension does <strong>not</strong> access your inbox list, contacts, attachments, account credentials, or any other data.</p>
+
+  <h2>2. How that data is used</h2>
+  <p>The email text described above is sent as a single HTTPS request to the PhishingDetector classification API. The API:</p>
+  <ul>
+    <li>Analyses the text using a locally-running machine learning model</li>
+    <li>Returns a risk classification, confidence score, and plain-English explanation</li>
+    <li>Does <strong>not</strong> store, log, or retain the email content in any database</li>
+  </ul>
+  <p>The result is displayed as a badge inside your email client. Once the browser tab is closed the data is gone.</p>
+
+  <h2>3. Data sharing</h2>
+  <p>Email content is <strong>never</strong> sold, shared, or disclosed to any third party. The only network destination is the PhishingDetector API endpoint configured in the extension settings (default: <code>https://rwolfe26-phishing-detector.hf.space</code>).</p>
+
+  <h2>4. Local storage</h2>
+  <p>The extension stores one item in Chrome's <code>chrome.storage.sync</code>: the API endpoint URL you configure in the settings popup. This URL is synced across your Chrome profiles. No email content is ever written to local or synced storage.</p>
+
+  <h2>5. Permissions explained</h2>
+  <ul>
+    <li><strong>Host access to mail.google.com, outlook.live.com, outlook.office.com, outlook.office365.com</strong> — required to read the email content from the page in order to analyse it.</li>
+    <li><strong>Host access to *.hf.space</strong> — required to send the email text to the classification API and receive the result.</li>
+    <li><strong>storage</strong> — required to save your API endpoint preference across sessions.</li>
+  </ul>
+
+  <h2>6. Children's privacy</h2>
+  <p>PhishingDetector is not directed at children under 13 and does not knowingly collect data from children.</p>
+
+  <h2>7. Changes to this policy</h2>
+  <p>If this policy changes materially, the "Last updated" date above will be revised. Continued use of the extension after a change constitutes acceptance of the updated policy.</p>
+
+  <h2>8. Contact</h2>
+  <p>Questions about this policy can be directed to the project repository:<br>
+    <a href="https://github.com/rwolfe26/PhishingDetectionSystem" target="_blank">github.com/rwolfe26/PhishingDetectionSystem</a>
+  </p>
+</article>
+
+</body>
+</html>

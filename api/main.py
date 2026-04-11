@@ -217,6 +217,15 @@ async def serve_frontend():
     return HTMLResponse("<h1>Phishing Detector API</h1><p>See <a href='/docs'>/docs</a></p>")
 
 
+@app.get("/privacy", response_class=HTMLResponse)
+async def serve_privacy():
+    """Serve the privacy policy page (required for Chrome Web Store listing)."""
+    html_path = static_dir / 'privacy.html'
+    if html_path.exists():
+        return html_path.read_text(encoding='utf-8')
+    return HTMLResponse("<h1>Privacy Policy</h1><p>privacy.html not found.</p>")
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def serve_dashboard():
     """Serve the monitoring dashboard HTML page."""

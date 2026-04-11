@@ -82,12 +82,38 @@ These 47 numeric features are combined with **128-dimensional LSA semantic embed
 |-----------|-----------|
 | REST API | FastAPI + Uvicorn, structured JSON logging, request-ID middleware |
 | Frontend | Vanilla JS SPA — split-panel layout, Barlow Condensed + JetBrains Mono typography, plain-English result summaries |
+| Browser extension | Chrome extension for Gmail and Outlook Web — injects a real-time risk badge into email threads as you read them (see below) |
 | IMAP Monitor | Polls a live mailbox, classifies incoming emails, stores results in SQLite |
 | Dashboard | Live monitoring view — classification history, stats, detection rate |
 | Feedback loop | Users correct wrong predictions; corrections feed back into retraining |
 | Testing | 60+ pytest tests across pipeline, preprocessing, API, and monitor |
 | CI/CD | GitHub Actions — lint (ruff) + full test suite on every push |
 | Deployment | Docker → Hugging Face Spaces (16 GB RAM), models stored on HF Hub |
+
+---
+
+## Browser Extension
+
+The repository includes a Chrome extension (`browser-extension/`) that brings phishing detection directly into Gmail and Outlook Web. When you open an email, the extension automatically classifies it and injects a colour-coded risk badge at the top of the thread — no copy-pasting required.
+
+**Features:**
+- Works on Gmail (`mail.google.com`) and Outlook Web (`outlook.live.com`, `outlook.office.com`)
+- Colour-coded `HIGH / MEDIUM / LOW / SAFE` badge with confidence score
+- Expandable plain-English explanation powered by the same API
+- Configurable API endpoint via the extension popup (defaults to the hosted HF Space)
+
+**Status:** The extension is fully functional and available for local use. It is not currently listed on the Chrome Web Store as this project is in active development. To try it yourself:
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/rwolfe26/PhishingDetectionSystem
+
+# 2. Open Chrome and go to chrome://extensions
+# 3. Enable Developer mode (top-right toggle)
+# 4. Click "Load unpacked" and select the browser-extension/ folder
+```
+
+The extension will immediately start scanning emails in Gmail and Outlook Web, hitting the live API at `https://rwolfe26-phishing-detector.hf.space`.
 
 ---
 

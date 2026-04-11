@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhishingDetector Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 300px;
+      background: #09090f;
+      color: #dddaf2;
+      font-family: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 14px 16px;
+      border-bottom: 1px solid #1c1c38;
+    }
+    .logo-mark {
+      width: 26px;
+      height: 26px;
+      background: #f59e0b;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800;
+      font-size: 0.72rem;
+      color: #000;
+      flex-shrink: 0;
+    }
+    .logo-text {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    .logo-text span { color: #f59e0b; }
+
+    /* Status strip */
+    .status-strip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: #0d0d1a;
+      border-bottom: 1px solid #1c1c38;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      color: #3d3b58;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .status-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: blink 2.5s ease-in-out infinite;
+    }
+    .status-dot.offline { background: #ef4444; animation: none; }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.2; }
+    }
+
+    /* Body */
+    .body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      color: #3d3b58;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    input[type="url"] {
+      width: 100%;
+      padding: 8px 10px;
+      background: #0d0d1a;
+      border: 1px solid #1c1c38;
+      border-radius: 2px;
+      color: #dddaf2;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input[type="url"]:focus { border-color: #f59e0b; }
+    input[type="url"]::placeholder { color: #3d3b58; }
+
+    .save-btn {
+      width: 100%;
+      padding: 9px;
+      background: #f59e0b;
+      border: none;
+      border-radius: 2px;
+      color: #000;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .save-btn:hover { background: #fcd34d; }
+
+    .feedback {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      text-align: center;
+      min-height: 14px;
+      letter-spacing: 0.3px;
+    }
+    .feedback.ok  { color: #22c55e; }
+    .feedback.err { color: #ef4444; }
+
+    /* Footer */
+    .footer {
+      padding: 10px 16px 14px;
+      border-top: 1px solid #1c1c38;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.58rem;
+      color: #3d3b58;
+      letter-spacing: 0.3px;
+      line-height: 1.7;
+    }
+    .footer a { color: #f59e0b; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo-mark">PD</div>
+    <div class="logo-text">Phishing<span>Detector</span></div>
+  </div>
+
+  <div class="status-strip">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Checking API…</span>
+  </div>
+
+  <div class="body">
+    <div>
+      <label>API Endpoint</label>
+      <input type="url" id="api-url"
+        placeholder="https://rwolfe26-phishing-detector.hf.space" />
+    </div>
+
+    <button class="save-btn" id="save-btn">Save</button>
+    <div class="feedback" id="feedback"></div>
+  </div>
+
+  <div class="footer">
+    Scans emails via your API endpoint.<br>
+    No email content is stored.<br>
+    <a href="https://github.com/rwolfe26/PhishingDetectionSystem" target="_blank">
+      View source on GitHub →
+    </a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

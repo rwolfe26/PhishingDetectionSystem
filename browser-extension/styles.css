@@ -1,0 +1,118 @@
+/* PhishingDetector badge — injected into Gmail and Outlook Web */
+
+#pd-badge {
+  all: initial; /* reset any inherited email styles */
+  display: block;
+  font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  border-radius: 3px;
+  border: 1px solid;
+  margin: 0 0 14px 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* ── Risk-level tints ─────────────────────────────────────────────────────── */
+#pd-badge.pd-high {
+  background: rgba(239, 68, 68, .07);
+  border-color: rgba(239, 68, 68, .35);
+}
+#pd-badge.pd-medium {
+  background: rgba(234, 179, 8, .07);
+  border-color: rgba(234, 179, 8, .35);
+}
+#pd-badge.pd-low {
+  background: rgba(249, 115, 22, .07);
+  border-color: rgba(249, 115, 22, .35);
+}
+#pd-badge.pd-safe {
+  background: rgba(34, 197, 94, .07);
+  border-color: rgba(34, 197, 94, .35);
+}
+#pd-badge.pd-loading,
+#pd-badge.pd-error {
+  background: #0f0f1a;
+  border-color: #252548;
+}
+
+/* ── Inner row ───────────────────────────────────────────────────────────── */
+#pd-badge .pd-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+}
+
+/* ── Risk pill ───────────────────────────────────────────────────────────── */
+#pd-badge .pd-pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  line-height: 1.6;
+}
+#pd-badge.pd-high   .pd-pill { background: rgba(239,68,68,.18);  color: #ef4444; }
+#pd-badge.pd-medium .pd-pill { background: rgba(234,179,8,.18);  color: #ca8a04; }
+#pd-badge.pd-low    .pd-pill { background: rgba(249,115,22,.18); color: #ea580c; }
+#pd-badge.pd-safe   .pd-pill { background: rgba(34,197,94,.18);  color: #16a34a; }
+
+/* ── Confidence text ─────────────────────────────────────────────────────── */
+#pd-badge .pd-conf {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+/* ── "Why?" toggle ───────────────────────────────────────────────────────── */
+#pd-badge .pd-why-btn {
+  all: initial;
+  margin-left: auto;
+  padding: 2px 9px;
+  border: 1px solid #d1d5db;
+  border-radius: 2px;
+  font-size: 11px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  color: #6b7280;
+  cursor: pointer;
+  background: transparent;
+  line-height: 1.6;
+  box-sizing: border-box;
+}
+#pd-badge .pd-why-btn:hover {
+  color: #111827;
+  border-color: #9ca3af;
+}
+
+/* ── Expanded summary ────────────────────────────────────────────────────── */
+#pd-badge .pd-summary {
+  padding: 8px 12px;
+  border-top: 1px solid rgba(0, 0, 0, .08);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: #1f2937;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: normal;
+  background: rgba(255, 255, 255, .5);
+}
+
+/* ── Loading / error states ──────────────────────────────────────────────── */
+#pd-badge .pd-status-text {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+#pd-badge .pd-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0, 0, 0, .12);
+  border-top-color: #f59e0b;
+  border-radius: 50%;
+  animation: pd-spin .7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes pd-spin { to { transform: rotate(360deg); } }

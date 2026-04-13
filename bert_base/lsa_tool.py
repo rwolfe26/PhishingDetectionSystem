@@ -53,6 +53,7 @@ from typing import Iterable, List, Optional
 import numpy as np
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import Normalizer
 
 class LSATextEncoder:
@@ -280,22 +281,22 @@ if __name__ == "__main__":
     # Example usage for demonstration purposes.  This block will not be
     # executed when the module is imported but can be run directly to test
     # functionality with a simple corpus.
-
+    
     # Define the path to the dataset directory relative to this script file
     script_dir = Path(__file__).parent
     dataset_dir = script_dir.parent / 'Datasets' / 'easy_ham'
 
     # Load emails from the directory
     emails = load_emails_from_directory(dataset_dir)
-
+    
     # Initialize and fit the encoder
     encoder = LSATextEncoder(n_components=100)  # Using 100 components for efficiency
     embeddings = encoder.fit_transform(emails)
-
+    
     # Print results
     print(f"Loaded {len(emails)} emails.")
     print("Embeddings shape:", embeddings.shape)
-
+    
     # Optionally, print explained variance to assess the model
     explained_variance = encoder.explained_variance_ratio()
     if explained_variance is not None:

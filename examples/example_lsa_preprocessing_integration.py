@@ -36,9 +36,10 @@ def load_emails_from_directory(directory: Path, limit: int = None):
 
 
 def main():
-    # Define paths (resolve to repo root, not examples/)
-    base_dir = Path(__file__).resolve().parent.parent
+    # Define paths
+    base_dir = Path(__file__).parent
     ham_dir = base_dir / 'Datasets' / 'easy_ham'
+    spam_dir = base_dir / 'Datasets' / 'spam'  # If you have spam data
 
     print("=" * 60)
     print("LSA + Preprocessing Integration Example")
@@ -65,14 +66,14 @@ def main():
 
     result = preprocess_email_with_lsa(test_email, lsa_encoder)
 
-    print("\nPreprocessing results:")
+    print(f"\nPreprocessing results:")
     print(f"  - Subject: {result['subject'][:50]}...")
     print(f"  - From: {result['from_address']}")
     print(f"  - URLs found: {len(result['urls'])}")
     print(f"  - Attachments: {len(result['attachments'])}")
-    print("\nFeature extraction:")
-    print(f"  - Numeric features: {result['feature_vector'][:5]}... (showing first 5)")
-    print(f"  - LSA embedding: {result['lsa_embedding'][:5]}... (showing first 5)")
+    print(f"\nFeature extraction:")
+    print(f"  - Numeric features (34 dims): {result['feature_vector'][:5]}... (showing first 5)")
+    print(f"  - LSA embedding (768 dims): {result['lsa_embedding'][:5]}... (showing first 5)")
     print(f"  - Combined vector shape: {result['combined_vector'].shape}")
 
     # Step 4: Batch processing for ML model training
@@ -84,6 +85,7 @@ def main():
     X = np.array([r['combined_vector'] for r in batch_results])
     print(f"Feature matrix shape: {X.shape}")
     print(f"  - Shape: (num_emails={X.shape[0]}, features={X.shape[1]})")
+    print(f"  - Features breakdown: 34 numeric + 768 LSA = 802 total")
 
     # Step 5: Quick extraction function (convenience wrapper)
     print("\n[Step 5] Using convenience function...")
@@ -94,7 +96,7 @@ def main():
     print("\n[Step 6] Saving the LSA encoder...")
     try:
         import joblib
-        encoder_path = base_dir / 'models' / 'lsa_encoder_768d.pkl'
+        encoder_path = base_dir / 'lsa_encoder_768d.pkl'
         joblib.dump(lsa_encoder, encoder_path)
         print(f"Encoder saved to: {encoder_path}")
         print("\nTo load later:")

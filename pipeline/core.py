@@ -5,13 +5,14 @@ Main EmailPhishingPipeline class that orchestrates the complete workflow.
 """
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 import numpy as np
 import joblib
 
 from preprocessing import (
     fit_lsa_encoder,
-    fit_lsa_encoder_from_texts,
+    preprocess_email_batch_with_lsa,
+    preprocess_email_with_lsa,
 )
 
 
@@ -19,12 +20,12 @@ class EmailPhishingPipeline:
     """
     Complete pipeline for email phishing detection.
 
-    Combines preprocessing (42 numeric features) with LSA semantic analysis
-    to create rich feature vectors for classification.
+    Combines preprocessing (34 numeric features) with LSA semantic analysis
+    (up to 768 dimensions) to create rich feature vectors for classification.
     """
 
     def __init__(self,
-                 lsa_components: int = 128,
+                 lsa_components: int = 768,
                  lsa_min_df: int = 2,
                  lsa_max_df: float = 0.85):
         """
@@ -47,8 +48,6 @@ class EmailPhishingPipeline:
         """
         Fit the LSA encoder on training emails.
 
-        Note: Prefer fit_lsa_and_extract() to avoid double-preprocessing.
-
         Args:
             emails: List of raw email texts
         """
@@ -65,60 +64,6 @@ class EmailPhishingPipeline:
 
         print(f"LSA encoder fitted with {self.lsa_encoder.n_components} components")
 
-    def fit_lsa_and_extract(self, emails: List[str]) -> np.ndarray:
-        """
-        Fit the LSA encoder AND extract features in a single preprocessing pass.
-
-        This is 2× faster than calling fit_lsa() followed by extract_features(),
-        because it avoids running the full email parser twice.
-
-        Args:
-            emails: List of raw email texts (training set)
-
-        Returns:
-            Feature matrix of shape (n_emails, n_numeric + n_lsa)
-        """
-
-        print(f"\n{'='*60}")
-        print("Single-Pass: Preprocessing + LSA Fit + Feature Extraction")
-        print(f"{'='*60}")
-        print(f"Processing {len(emails)} emails (single pass)...")
-
-        # One pass: parse emails, collect body texts and numeric features
-        body_texts = []
-        numeric_features_list = []
-        for i, email in enumerate(emails):
-            from preprocessing import preprocess_email as _pe
-            result = _pe(email)
-            body_texts.append(f"{result['subject']} {result['body_text']}")
-            numeric_features_list.append(np.array(result['feature_vector'], dtype=np.float32))
-            if (i + 1) % 2000 == 0:
-                print(f"  Parsed {i+1}/{len(emails)} emails...")
-
-        # Fit LSA on body texts
-        self.lsa_encoder = fit_lsa_encoder_from_texts(
-            body_texts,
-            n_components=self.lsa_components,
-            min_df=self.lsa_min_df,
-            max_df=self.lsa_max_df,
-        )
-
-        # Batch transform all texts with LSA at once
-        lsa_embeddings = self.lsa_encoder.transform(body_texts)
-
-        # Concatenate numeric + LSA for each email
-        X = np.array([
-            np.concatenate([numeric_features_list[i], lsa_embeddings[i]])
-            for i in range(len(emails))
-        ])
-
-        self.feature_dim = X.shape[1]
-        n_numeric = len(numeric_features_list[0])
-        print(f"Feature extraction complete: shape = {X.shape}")
-        print(f"  - {n_numeric} numeric features + {self.lsa_encoder.n_components} LSA dims")
-
-        return X
-
     def extract_features(self, emails: List[str]) -> np.ndarray:
         """
         Extract combined features (preprocessing + LSA) from emails.
@@ -134,29 +79,18 @@ class EmailPhishingPipeline:
 
         print(f"Extracting features from {len(emails)} emails...")
 
-        from preprocessing import preprocess_email as _pe
-        body_texts = []
-        numeric_features_list = []
-        for i, email in enumerate(emails):
-            result = _pe(email)
-            body_texts.append(f"{result['subject']} {result['body_text']}")
-            numeric_features_list.append(np.array(result['feature_vector'], dtype=np.float32))
-            if (i + 1) % 2000 == 0:
-                print(f"  Parsed {i+1}/{len(emails)} emails...")
+        # Use batch preprocessing with LSA
+        results = preprocess_email_batch_with_lsa(emails, self.lsa_encoder)
 
-        lsa_embeddings = self.lsa_encoder.transform(body_texts)
-
-        X = np.array([
-            np.concatenate([numeric_features_list[i], lsa_embeddings[i]])
-            for i in range(len(emails))
-        ])
+        # Extract combined feature vectors
+        X = np.array([r['combined_vector'] for r in results])
 
         if self.feature_dim is None:
             self.feature_dim = X.shape[1]
 
-        n_numeric = len(numeric_features_list[0]) if numeric_features_list else 0
         print(f"Extracted features: shape = {X.shape}")
-        print(f"  - {n_numeric} numeric features + {self.lsa_encoder.n_components} LSA dims")
+        print(f"  - {self.feature_dim} total dimensions")
+        print(f"  - 34 numeric features + {self.lsa_encoder.n_components} LSA dimensions")
 
         return X
 
@@ -214,12 +148,12 @@ class EmailPhishingPipeline:
         # Load LSA encoder
         lsa_path = model_dir / 'lsa_encoder.pkl'
         self.lsa_encoder = joblib.load(lsa_path)
-        print("✓ LSA encoder loaded")
+        print(f"✓ LSA encoder loaded")
 
         # Load classifier
         clf_path = model_dir / 'phishing_classifier.pkl'
         self.classifier = joblib.load(clf_path)
-        print("✓ Classifier loaded")
+        print(f"✓ Classifier loaded")
 
         # Load metadata
         metadata_path = model_dir / 'pipeline_metadata.pkl'
@@ -227,6 +161,6 @@ class EmailPhishingPipeline:
         self.feature_dim = metadata['feature_dim']
         self.lsa_min_df = metadata['lsa_min_df']
         self.lsa_max_df = metadata['lsa_max_df']
-        print("✓ Metadata loaded")
+        print(f"✓ Metadata loaded")
 
-        print("Models loaded successfully!")
+        print(f"Models loaded successfully!")

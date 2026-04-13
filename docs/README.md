@@ -27,11 +27,9 @@ Detailed documentation of the refactored modular structure:
 
 Comprehensive guide to using the complete pipeline:
 - Installation instructions
-- Training workflow (including `--include-feedback` for active learning)
+- Training workflow
 - Prediction workflow
-- Feature breakdown (47 numeric + 128 LSA = 175 total features)
-- IMAP monitor CLI reference
-- API endpoint reference (classifier, dashboard, feedback, monitor)
+- Feature breakdown (34 numeric + LSA dimensions)
 - Performance tips and troubleshooting
 - Advanced usage patterns
 
@@ -50,7 +48,7 @@ Comprehensive guide to using the complete pipeline:
 Technical documentation on how LSA semantic analysis integrates with preprocessing:
 - Architecture overview
 - Integration functions (`fit_lsa_encoder`, `preprocess_email_with_lsa`)
-- Combined feature vector composition (47 numeric + 128 LSA = 175 total)
+- Combined feature vector composition (34 + N dimensions)
 - Usage examples and code snippets
 - Troubleshooting LSA issues
 
@@ -111,9 +109,8 @@ Documentation of the transition from monolithic to modular structure:
 ### In Other Directories
 
 - **`../bert_base/lsa_research_report.md`** - LSA methodology and research
-- **`../DEPLOY.md`** - Step-by-step deployment guide (Hugging Face Hub + Render / HF Spaces)
 - **`../examples/`** - Example scripts demonstrating usage
-- **`../tests/`** - 60+ pytest tests covering pipeline, API, monitor, and feedback
+- **`../tests/test_preprocessing.py`** - Test code showing usage patterns
 
 ### External Resources
 
@@ -129,11 +126,9 @@ Documentation of the transition from monolithic to modular structure:
 
 | Task | Documentation |
 |------|---------------|
-| Install and run | [Main README](../README.md) → Running locally |
+| Install and run | [Main README](../README.md) → Quick Start |
 | Train a model | [PIPELINE_GUIDE.md](PIPELINE_GUIDE.md) → Training |
-| Retrain with feedback | [PIPELINE_GUIDE.md](PIPELINE_GUIDE.md) → `--include-feedback` |
 | Make predictions | [PIPELINE_GUIDE.md](PIPELINE_GUIDE.md) → Prediction |
-| Deploy to production | [DEPLOY.md](../DEPLOY.md) |
 | Understand architecture | [MODULAR_STRUCTURE.md](MODULAR_STRUCTURE.md) |
 | Add new features | [MODULAR_STRUCTURE.md](MODULAR_STRUCTURE.md) → Extending |
 | Use in own code | [LSA_PREPROCESSING_INTEGRATION.md](LSA_PREPROCESSING_INTEGRATION.md) → Examples |
@@ -141,4 +136,4 @@ Documentation of the transition from monolithic to modular structure:
 
 ---
 
-**Last Updated**: April 2026
+**Last Updated**: February 2026

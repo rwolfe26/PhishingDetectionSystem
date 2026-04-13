@@ -1,231 +1,285 @@
----
-title: Phishing Detector
-colorFrom: red
-colorTo: purple
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # Email Phishing Detection System
 
-A production-ready machine learning system that classifies emails as phishing or legitimate in real time. Built end-to-end — from raw feature engineering and model training to a deployed web application with a live demo.
+A production-ready machine learning pipeline for detecting phishing emails using preprocessing and semantic analysis.
 
-**[Try the live demo →](https://rwolfe26-phishing-detector.hf.space)**
+## Quick Start
 
----
-
-## What it does
-
-Paste any email (or upload a `.txt` / `.eml` file) and the system:
-
-- Classifies it as **phishing** or **safe** with a confidence score
-- Gives a **plain-English summary** of why — written for non-technical users, not data scientists
-- Explains *why* using the top contributing features and SHAP values
-- Highlights the specific words and phrases that triggered the detection
-- Assigns a risk level: `HIGH / MEDIUM / LOW / SAFE`
-
----
-
-## Model performance
-
-Trained on **17,204 emails** (11,306 legitimate + 5,898 phishing/spam) across 5 public datasets:
-
-| Metric | Score |
-|--------|-------|
-| Accuracy | **98.55%** |
-| Precision | 98.04% |
-| Recall | 97.71% |
-| F1-Score | 97.88% |
-| AUC-ROC | **99.91%** |
-| False Positive Rate | 1.02% |
-| False Negative Rate | 2.29% |
-
----
-
-## Technical highlights
-
-### Feature engineering — 175 features total
-
-Rather than relying solely on a pre-trained language model, I built a 47-feature handcrafted extractor that captures email-specific signals a generic model would miss:
-
-| Category | Features | What it catches |
-|----------|----------|-----------------|
-| URL analysis | 10 | IP-based URLs, HTTPS ratio, shorteners (bit.ly etc.), brand typosquatting via Levenshtein distance |
-| Text analysis | 7 | Word count, special-char ratio, unique-word ratio, caps ratio |
-| Keyword analysis | 3 | Urgency phrases, credential requests, action words |
-| Header analysis | 6 | Reply-To mismatch, SPF/DKIM failure, display-name spoofing |
-| HTML analysis | 6 | Hidden forms, iframes, invisible text |
-| Attachments | 3 | Executable extensions, double-extension tricks (`.pdf.exe`) |
-| Phishing signals | 10 | Brand impersonation score, homograph characters, urgency density, generic greetings |
-| URL redirect resolution | 2 | Follows shortened URLs to their final destination domain |
-
-These 47 numeric features are combined with **128-dimensional LSA semantic embeddings** (TF-IDF → Truncated SVD → L2 normalisation) to produce a **175-feature vector** per email.
-
-### Machine learning
-
-- **Random Forest** (200 trees, balanced class weights) — chosen for its robustness to outliers and interpretability
-- Benchmarked against XGBoost, Logistic Regression, Linear SVM, and Gradient Boosting
-- Hyperparameter tuning via `RandomizedSearchCV` (30 parameter combinations)
-- 5-fold cross-validation with per-fold error analysis
-
-### Explainability
-
-- **Plain-English summary** — rule-based narrative explanation generated from all 44 numeric signals; written for non-technical users (e.g. "The sender's display name doesn't match their actual email address, a classic impersonation tactic")
-- **Feature importance** — ranked contribution of each of the 175 features
-- **SHAP values** — per-prediction Shapley explanations
-- **Indicator highlighting** — the exact words/phrases flagged in the email text
-
-### Production system
-
-| Component | Technology |
-|-----------|-----------|
-| REST API | FastAPI + Uvicorn, structured JSON logging, request-ID middleware |
-| Frontend | Vanilla JS SPA — split-panel layout, Barlow Condensed + JetBrains Mono typography, plain-English result summaries |
-| Browser extension | Chrome extension for Gmail and Outlook Web — injects a real-time risk badge into email threads as you read them (see below) |
-| IMAP Monitor | Polls a live mailbox, classifies incoming emails, stores results in SQLite |
-| Dashboard | Live monitoring view — classification history, stats, detection rate |
-| Feedback loop | Users correct wrong predictions; corrections feed back into retraining |
-| Testing | 60+ pytest tests across pipeline, preprocessing, API, and monitor |
-| CI/CD | GitHub Actions — lint (ruff) + full test suite on every push |
-| Deployment | Docker → Hugging Face Spaces (16 GB RAM), models stored on HF Hub |
-
----
-
-## Browser Extension
-
-The repository includes a Chrome extension (`browser-extension/`) that brings phishing detection directly into Gmail and Outlook Web. When you open an email, the extension automatically classifies it and injects a colour-coded risk badge at the top of the thread — no copy-pasting required.
-
-**Features:**
-- Works on Gmail (`mail.google.com`) and Outlook Web (`outlook.live.com`, `outlook.office.com`)
-- Colour-coded `HIGH / MEDIUM / LOW / SAFE` badge with confidence score
-- Expandable plain-English explanation powered by the same API
-- Configurable API endpoint via the extension popup (defaults to the hosted HF Space)
-
-**Status:** The extension is fully functional and available for local use. It is not currently listed on the Chrome Web Store as this project is in active development. To try it yourself:
-
+### Installation
 ```bash
-# 1. Clone the repo
-git clone https://github.com/rwolfe26/PhishingDetectionSystem
+# Clone the repository
+cd Detection_System
 
-# 2. Open Chrome and go to chrome://extensions
-# 3. Enable Developer mode (top-right toggle)
-# 4. Click "Load unpacked" and select the browser-extension/ folder
+# Activate virtual environment
+source .venv/bin/activate
+
+# Install dependencies (already installed)
+pip install scikit-learn joblib numpy
 ```
 
-The extension will immediately start scanning emails in Gmail and Outlook Web, hitting the live API at `https://rwolfe26-phishing-detector.hf.space`.
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                     Web Frontend (SPA)                  │
-│          Paste email / Upload file / View result        │
-└────────────────────────┬────────────────────────────────┘
-                         │ POST /classify
-┌────────────────────────▼────────────────────────────────┐
-│                    FastAPI Backend                      │
-│  • Feature extraction (47 numeric)                      │
-│  • LSA encoding (128 dims)                              │
-│  • Random Forest inference                              │
-│  • SHAP + feature importance explanation                │
-└──────┬──────────────────────────────────────┬───────────┘
-       │                                      │
-┌──────▼───────┐                   ┌──────────▼──────────┐
-│  ML Pipeline │                   │   IMAP Monitor      │
-│  core.py     │                   │   monitor.py        │
-│  trainer.py  │                   │   SQLite storage    │
-│  predictor.py│                   │   Dashboard API     │
-└──────────────┘                   └─────────────────────┘
-```
-
----
-
-## Project structure
-
-```
-├── pipeline/               # ML pipeline (train, predict, benchmark, tune)
-│   ├── core.py             # EmailPhishingPipeline — orchestrates everything
-│   ├── data_loader.py      # Loads from dirs, CSV, JSONL
-│   ├── trainer.py          # Training, cross-validation, hyperparameter tuning
-│   └── predictor.py        # Single-email inference
-│
-├── preprocessing/          # Email feature extraction
-│   ├── email_parser.py     # RFC 822 / MIME parsing
-│   ├── url_extractor.py    # URL analysis + redirect resolution
-│   └── feature_extractor.py  # 47 handcrafted numeric features
-│
-├── bert_base/lsa_tool.py   # TF-IDF + TruncatedSVD semantic encoder
-│
-├── api/                    # FastAPI web application
-│   ├── main.py             # REST endpoints + middleware
-│   ├── explainer.py        # SHAP + feature importance + indicator highlighting
-│   └── static/             # Dark-mode SPA + monitoring dashboard
-│
-├── email_monitor/          # IMAP monitoring system
-│   ├── imap_client.py      # IMAP connection + unseen email fetcher
-│   ├── monitor.py          # Classification loop + alerting
-│   ├── storage.py          # SQLite classification history
-│   └── feedback.py         # User correction store (active learning)
-│
-├── tests/                  # 60+ pytest tests
-├── run_pipeline.py         # CLI entry point
-├── monitor.py              # IMAP monitor CLI entry point
-├── download_models.py      # Downloads models from HF Hub at startup
-└── Dockerfile              # Production container
-```
-
----
-
-## Running locally
-
+### Train the Model
 ```bash
-git clone https://github.com/rwolfe26/PhishingDetectionSystem
-cd PhishingDetectionSystem
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-# Download pre-trained models
-python download_models.py  # set HF_REPO_ID=rwolfe26/phishing-detector first
-# or train from scratch (requires datasets in Datasets/)
+# Basic training
 python run_pipeline.py --train
 
-# Start the API
-uvicorn api.main:app --reload
-# Open http://localhost:8000
+# Custom parameters
+python run_pipeline.py --train --lsa-components 256 --test-size 0.2
 ```
 
----
-
-## Training pipeline CLI
-
+### Classify Emails
 ```bash
-# Train with cross-validation and error analysis
-python run_pipeline.py --train --cross-validate --error-analysis
+# Predict a single email
+python run_pipeline.py --predict Datasets/spam/0000.7b1b73cf36cf9dbc3d64e3f2ee2b91f1
 
-# Benchmark all classifiers
-python run_pipeline.py --benchmark
-
-# Hyperparameter tuning
-python run_pipeline.py --tune
-
-# Retrain including user feedback corrections
-python run_pipeline.py --train --include-feedback
-
-# Classify a single email file
-python run_pipeline.py --predict path/to/email.txt
+# Example output:
+# Prediction: SPAM
+# Confidence: 62.85%
+# Risk Level: LOW (Possibly spam)
 ```
 
----
+## 📊 Current Performance
 
-## Tech stack
+Training on **3,052 emails** (2,551 ham + 501 spam):
+- **Accuracy: 99.35%**
+- **Precision: 98.98%**
+- **Recall: 97.00%**
+- **F1-Score: 97.98%**
+- **False Positive Rate: 0.20%** (1 in 511 ham emails)
+- **False Negative Rate: 3.00%** (3 in 100 spam emails)
 
-**Python** · **scikit-learn** · **FastAPI** · **SHAP** · **SQLite** · **Docker** · **GitHub Actions** · **Hugging Face Hub/Spaces**
+## Project Structure
 
----
+```
+Detection_System/
+├── run_pipeline.py              # Main CLI entry point
+│
+├── pipeline/                     # Modular pipeline package
+│   ├── __init__.py              # Package exports
+│   ├── core.py                  # EmailPhishingPipeline class
+│   ├── data_loader.py           # Data loading utilities
+│   ├── trainer.py               # Training and evaluation
+│   └── predictor.py             # Prediction logic
+│
+├── preprocessing/                # Email preprocessing module
+│   ├── __init__.py              # LSA integration
+│   ├── email_parser.py          # RFC 822 email parsing
+│   ├── url_extractor.py         # URL analysis and extraction
+│   └── feature_extractor.py    # 34 numeric features
+│
+├── bert_base/                    # Semantic analysis
+│   ├── lsa_tool.py              # LSA encoder (768 dimensions)
+│   └── lsa_research_report.md   # Methodology documentation
+│
+├── models/                       # Saved trained models
+│   ├── lsa_encoder.pkl          # Trained LSA encoder
+│   ├── phishing_classifier.pkl  # Random Forest classifier
+│   └── pipeline_metadata.pkl    # Pipeline configuration
+│
+├── Datasets/                     # Email datasets
+│   ├── easy_ham/                # Legitimate emails (2,551)
+│   ├── spam/                    # Spam emails (501)
+│   └── *.tar.bz2                # Additional datasets (compressed)
+│
+├── tests/                        # Unit tests
+│   └── test_preprocessing.py    # Preprocessing tests
+│
+├── docs/                         # Documentation
+│   ├── MODULAR_STRUCTURE.md     # Detailed module docs
+│   ├── PIPELINE_GUIDE.md        # Pipeline usage guide
+│   ├── LSA_PREPROCESSING_INTEGRATION.md  # Integration details
+│   └── REFACTORING_SUMMARY.md   # Refactoring notes
+│
+├── examples/                     # Example scripts
+│   └── example_lsa_preprocessing_integration.py
+│
+├── old_models/                   # Archived models
+│   └── pipeline_monolithic_backup.py  # Original pipeline
+│
+└── README.md                     # This file
+```
 
-## License
+## Features
 
-MIT
+### Email Preprocessing (34 Features)
+- **URL Analysis**: IP addresses, HTTPS ratio, suspicious ports, path depth
+- **Text Analysis**: Word counts, special characters, unique words
+- **Header Analysis**: Reply-To mismatches, suspicious mailers, received hops
+- **HTML Analysis**: Forms, iframes, hidden text, external links
+- **Attachment Analysis**: Executables, archives, attachment count
+
+### LSA Semantic Analysis (256-768 Dimensions)
+- **TF-IDF Vectorization**: Sublinear scaling with n-grams
+- **Truncated SVD**: Latent semantic structure extraction
+- **L2 Normalization**: Stable embeddings independent of email length
+
+### Classification
+- **Random Forest**: 100 decision trees, optimized hyperparameters
+- **Feature Importance**: Identifies key phishing indicators
+- **Risk Levels**: HIGH/MEDIUM/LOW/Safe based on confidence scores
+
+## Documentation
+
+Detailed documentation is available in the `docs/` directory:
+
+- **[MODULAR_STRUCTURE.md](docs/MODULAR_STRUCTURE.md)** - Module architecture and design
+- **[PIPELINE_GUIDE.md](docs/PIPELINE_GUIDE.md)** - Complete usage guide
+- **[LSA_PREPROCESSING_INTEGRATION.md](docs/LSA_PREPROCESSING_INTEGRATION.md)** - Integration details
+- **[REFACTORING_SUMMARY.md](docs/REFACTORING_SUMMARY.md)** - Project evolution
+
+## Usage Examples
+
+### Programmatic Usage
+
+```python
+from pathlib import Path
+from pipeline import EmailPhishingPipeline, DataLoader, Trainer, Predictor
+
+# Initialize and train
+pipeline = EmailPhishingPipeline(lsa_components=256)
+data_loader = DataLoader()
+emails, labels = data_loader.load_dataset(ham_dirs, spam_dirs)
+
+pipeline.fit_lsa(emails)
+X = pipeline.extract_features(emails)
+
+trainer = Trainer()
+trainer.train_classifier(pipeline, X_train, y_train)
+pipeline.save_models(Path('models'))
+
+# Load and predict
+pipeline.load_models(Path('models'))
+predictor = Predictor()
+prediction, probability = predictor.predict_single(pipeline, email_text)
+```
+
+### Integration
+
+```python
+from preprocessing import preprocess_email_with_lsa
+import joblib
+
+# Load saved models
+lsa_encoder = joblib.load('models/lsa_encoder.pkl')
+classifier = joblib.load('models/phishing_classifier.pkl')
+
+# Process email
+result = preprocess_email_with_lsa(raw_email, lsa_encoder)
+X = result['combined_vector'].reshape(1, -1)
+
+# Predict
+prediction = classifier.predict(X)[0]  # 0=ham, 1=spam
+probability = classifier.predict_proba(X)[0][1]  # spam confidence
+```
+
+## 🎯 Roadmap & Requirements
+
+### MVP (Current Status) ✅
+- ✅ Email parsing and feature extraction
+- ✅ LSA semantic analysis
+- ✅ Random Forest classifier (99.35% accuracy)
+- ✅ CLI interface for training and prediction
+- ✅ Model persistence and loading
+- ✅ Risk level classification
+
+### Phase 1 (Planned)
+- [ ] Web interface (FastAPI + React)
+- [ ] Explainability (SHAP/LIME feature attribution)
+- [ ] Highlighted spans showing phishing indicators
+- [ ] URL expansion and redirect resolution
+- [ ] Enhanced attachment analysis
+
+### Phase 2 (Future)
+- [ ] Gmail/IMAP integration (read-only OAuth)
+- [ ] Real-time classification API
+- [ ] User feedback loop for active learning
+- [ ] Dashboard for monitoring and analytics
+- [ ] A/B testing for model improvements
+
+### Phase 3 (Extended)
+- [ ] Multi-language support
+- [ ] Brand impersonation detection
+- [ ] Adversarial robustness testing
+- [ ] Federated learning for privacy
+- [ ] Mobile app integration
+
+## Technical Details
+
+### Feature Engineering
+- **Header Analysis**: From/Reply-To domain matching, X-Mailer patterns
+- **URL Forensics**: Entropy, TLD rarity, homograph detection, redirect chains
+- **Body Analysis**:
+  - Lexical: Urgency keywords, financial terms, credential requests
+  - Structural: HTML forms, hidden text, base64 blobs, CSS tricks
+- **Semantic**: Transformer-inspired embeddings via LSA
+
+### Model Architecture
+```
+Raw Email
+    ↓
+[Email Parser] → Subject, Body, Headers, Attachments
+    ↓
+[URL Extractor] → URL patterns and analysis
+    ↓
+[Feature Extractor] → 34 numeric features
+    ↓
+[LSA Encoder] → 256-768 semantic dimensions
+    ↓
+[Combined Vector] → 290-802 total features
+    ↓
+[Random Forest] → Classification + Confidence
+```
+
+### Training Pipeline
+1. Load datasets from multiple directories
+2. Train LSA encoder on email corpus (TF-IDF + SVD)
+3. Extract combined features (numeric + semantic)
+4. Train Random Forest with cross-entropy loss
+5. Evaluate on held-out test set
+6. Save models for deployment
+
+## Security & Privacy
+
+### Current Implementation
+- **In-Memory Processing**: Emails processed without persistence
+- **No Data Collection**: No raw emails stored
+- **Metadata Only**: URL analysis via HEAD requests (no active fetching)
+- **Local Inference**: All processing happens locally
+
+### Planned Security Features
+- **Content Safety**: Never auto-fetch attachments
+- **Rate Limiting**: Prevention of adversarial usage
+- **PII Redaction**: Anonymization of stored samples
+- **OAuth Security**: Least-privilege scopes for email access
+
+## Dataset Information
+
+### Included Datasets
+- **easy_ham**: 2,551 legitimate emails
+- **spam**: 501 spam emails
+
+### Additional Available Datasets
+Compressed archives in `Datasets/` (extract to add more training data):
+- `spam_2.tar.bz2`, `spam_3.tar.bz2`, `spam_4.tar.bz2`
+- `easy_ham_2.tar.bz2`, `easy_ham_3.tar.bz2`
+- `hard_ham.tar.bz2`, `hard_ham_2.tar.bz2`
+
+Extract with:
+```bash
+cd Datasets
+tar -xjf spam_2.tar.bz2
+tar -xjf easy_ham_2.tar.bz2
+```
+
+## Testing
+
+Run the test suite:
+```bash
+python -m pytest tests/ -v
+```
+
+Run preprocessing tests:
+```bash
+python -m pytest tests/test_preprocessing.py -v
+```
+
+
+
